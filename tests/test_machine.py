@@ -33,7 +33,7 @@ class ArithmeticMachineTests(unittest.TestCase):
             machine.execute(Instruction(4, 0, "+", 3))
 
     def test_value_limit_is_enforced(self):
-        machine = ArithmeticMachine([8, 8], value_limit=100)
+        machine = ArithmeticMachine([11, 11], value_limit=100)
         with self.assertRaisesRegex(MachineError, "value_limit"):
             machine.execute(Instruction(2, 0, "*", 1))
 
