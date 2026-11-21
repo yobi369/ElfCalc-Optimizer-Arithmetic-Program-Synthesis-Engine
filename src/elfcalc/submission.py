@@ -79,7 +79,9 @@ def write_submission(
     if len(expected) != len(puzzle_ids):
         raise ValueError("puzzle_ids contains duplicates")
 
-    with Path(path).open("w", encoding="utf-8", newline="") as handle:
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with destination.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=["id", "program"], lineterminator="\n")
         writer.writeheader()
         for puzzle_id in puzzle_ids:
