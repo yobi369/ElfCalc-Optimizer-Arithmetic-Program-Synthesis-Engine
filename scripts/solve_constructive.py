@@ -22,6 +22,9 @@ def main() -> int:
     puzzles = load_puzzles(args.puzzles)
     fallback_path = Path(args.fallback) if args.fallback else None
     fallback = load_submission(fallback_path) if fallback_path and fallback_path.exists() else {}
+    puzzle_ids = [puzzle.puzzle_id for puzzle in puzzles]
+    if fallback and set(fallback) != set(puzzle_ids):
+        raise ValueError("fallback submission IDs do not match the selected puzzle dataset")
     programs = {}
     improved = 0
     failed = 0
