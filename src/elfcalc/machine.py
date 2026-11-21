@@ -1,8 +1,7 @@
 """Small, deterministic exact-integer virtual machine.
 
 The instruction representation is an internal project model. The official Kaggle
-serialization adapter will map competition rows to this model after the schema
-has been checked against the downloaded competition data.
+serialization adapter maps competition rows to this model after schema checks.
 """
 
 from __future__ import annotations
@@ -11,6 +10,9 @@ from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 REGISTER_COUNT = 48
+MAX_INSTRUCTIONS = 4096
+MAX_PROGRAM_BYTES = 131072
+MAX_VALUE = 10**18
 OPERATORS = frozenset({"+", "-", "*", "/"})
 
 
