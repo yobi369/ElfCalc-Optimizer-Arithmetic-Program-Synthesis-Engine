@@ -115,8 +115,8 @@ def main() -> int:
         report_path.parent.mkdir(parents=True, exist_ok=True)
         counts = [item["instructions"] for item in per_puzzle]
         report = {
-            "solver": "elfcalc-constructive-v1",
-            "method": "all feasible positional bases 2..32; signed-window widths 3..8",
+            "solver": "elfcalc-constructive-v2",
+            "method": "all feasible positional bases 2..32; signed-window widths 3..8; streaming signed-window widths 9..14",
             "python_version": platform.python_version(),
             "runtime_seconds": round(elapsed, 3),
             "puzzles": len(puzzles),
