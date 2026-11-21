@@ -141,28 +141,18 @@ def _digits(value: int, base: int) -> list[int]:
 
 
 def _candidate_bases(puzzle: Puzzle) -> list[int]:
+    """Enumerate every positional base that leaves a small scratch reserve."""
     missing = set(puzzle.targets) - set(puzzle.starting_values)
     maximum = min(puzzle.value_limit, max(missing, default=1), 32)
-    ranked = []
+    selected = []
     for base in range(2, maximum + 1):
         constants = {1, base}
-        estimate = 0
         for target in missing:
-            digits = _digits(target, base)
-            constants.update(digit for digit in digits if digit)
-            estimate += max(0, len(digits) - 1) + sum(bool(digit) for digit in digits[:-1])
-        scratch_reserve = 4
+            constants.update(digit for digit in _digits(target, base) if digit)
         needed = len(constants - set(puzzle.starting_values))
-        if len(puzzle.starting_values) + needed + scratch_reserve > puzzle.registers:
-            continue
-        ranked.append((estimate + needed, base))
-    selected = {base for _, base in sorted(ranked)[:5]}
-    selected.update(
-        base for base in (2, 3, 4, 5, 8, 10, 12, 16, 20, 24, 32)
-        if base <= maximum and any(candidate == base for _, candidate in ranked)
-    )
-    return sorted(selected)
-
+        if len(puzzle.starting_values) + needed + 4 <= puzzle.registers:
+            selected.append(base)
+    return selected
 
 def _solve_base(puzzle: Puzzle, base: int) -> tuple[Instruction, ...]:
     missing = set(puzzle.targets) - set(puzzle.starting_values)
@@ -408,7 +398,7 @@ def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
             candidates.append(_solve_base(puzzle, base))
         except (ValueError, KeyError, RecursionError):
             continue
-    for width in (4, 5, 6):
+    for width in (3, 4, 5, 6, 7, 8):
         try:
             candidates.append(_solve_signed_window(puzzle, width))
         except (ValueError, KeyError, RecursionError):
