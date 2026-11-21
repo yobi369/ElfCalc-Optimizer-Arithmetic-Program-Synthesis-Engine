@@ -486,11 +486,96 @@ def _solve_signed_window_streaming(puzzle: Puzzle, width: int) -> tuple[Instruct
     return result
 
 
+
+def _solve_shared_intermediate_dag(puzzle: Puzzle) -> tuple[Instruction, ...]:
+    """Construct reusable one-level DAG nodes that unlock multiple targets.
+
+    A node is accepted only when its value makes at least two currently
+    uncovered targets directly reachable from the existing value set. The
+    resulting targets are then emitted through the ordinary register builder.
+    This bounded beam-free pass is deterministic and keeps exact arithmetic.
+    """
+    missing = set(puzzle.targets) - set(puzzle.starting_values)
+    if not missing:
+        return ()
+
+    builder = _RegisterBuilder(puzzle, set())
+    while builder.remaining:
+        # First consume all targets already reachable without adding a node.
+        changed = True
+        while changed:
+            changed = False
+            for target in sorted(builder.remaining):
+                recipe = builder.direct(target)
+                if recipe is not None:
+                    builder.emit(*recipe)
+                    changed = True
+        if not builder.remaining:
+            break
+
+        known = sorted(builder.locations)
+        best = None
+        # Enumerate legal one-instruction expressions over currently known
+        # values. Each accepted expression must unlock at least two targets.
+        for left_value in known:
+            left = builder.register(left_value)
+            assert left is not None
+            for right_value in known:
+                right = builder.register(right_value)
+                assert right is not None
+                expressions = [
+                    ("+", left_value + right_value, "+"),
+                    ("-", left_value - right_value, "-"),
+                    ("*", left_value * right_value, "*"),
+                ]
+                if right_value and left_value % right_value == 0:
+                    expressions.append(("/", left_value // right_value, "/"))
+                for operator, result, _ in expressions:
+                    if result <= 0 or result > puzzle.value_limit:
+                        continue
+                    if result in builder.locations or result in builder.remaining:
+                        continue
+                    gain = 0
+                    for target in builder.remaining:
+                        if target == result:
+                            continue
+                        for anchor in known:
+                            if (result + anchor == target or
+                                abs(result - anchor) == target or
+                                result * anchor == target or
+                                (anchor and result % anchor == 0 and result // anchor == target) or
+                                (result and anchor % result == 0 and anchor // result == target)):
+                                gain += 1
+                                break
+                    if gain < 2:
+                        continue
+                    candidate = (gain, -result, operator, left, right, result)
+                    if best is None or candidate > best:
+                        best = candidate
+
+        if best is None:
+            break
+        _, _, operator, left, right, _ = best
+        builder.emit(operator, left, right)
+
+    if builder.remaining:
+        raise ValueError(f"shared-intermediate DAG missed targets: {sorted(builder.remaining)}")
+    result = tuple(builder.program)
+    validation = validate_program(puzzle, result)
+    if not validation.complete:
+        raise ValueError(validation.error or "shared-intermediate DAG failed validation")
+    return result
+
+
 def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
     """Try positive-radix and signed-window constructions; retain the shortest."""
     if not set(puzzle.targets) - set(puzzle.starting_values):
         return ()
     candidates = []
+    try:
+        candidates.append(_solve_shared_intermediate_dag(puzzle))
+    except (ValueError, KeyError, RecursionError):
+        pass
     feasible_bases = _candidate_bases(puzzle)
     for base in feasible_bases:
         try:
