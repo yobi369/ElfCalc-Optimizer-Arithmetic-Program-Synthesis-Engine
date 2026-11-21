@@ -140,6 +140,38 @@ def _digits(value: int, base: int) -> list[int]:
     return output
 
 
+
+def _shared_prefix_order(values: set[int], base: int, estimate) -> list[int]:
+    """Greedily order targets by shared most-significant positional prefixes.
+
+    Nearby targets in this ordering are more likely to reuse quotient/prefix
+    values already materialized by the recursive base constructor.
+    """
+    digits = {value: tuple(reversed(_digits(value, base))) for value in values}
+    remaining = set(values)
+    if not remaining:
+        return []
+    first = min(remaining, key=lambda value: (estimate(value), digits[value], value))
+    ordered = [first]
+    remaining.remove(first)
+    while remaining:
+        previous = digits[ordered[-1]]
+
+        def priority(value: int):
+            current = digits[value]
+            common = 0
+            for left, right in zip(previous, current):
+                if left != right:
+                    break
+                common += 1
+            return (-common, estimate(value), digits[value], value)
+
+        selected = min(remaining, key=priority)
+        ordered.append(selected)
+        remaining.remove(selected)
+    return ordered
+
+
 def _candidate_bases(puzzle: Puzzle) -> list[int]:
     """Enumerate every positional base that leaves a small scratch reserve."""
     missing = set(puzzle.targets) - set(puzzle.starting_values)
@@ -154,7 +186,7 @@ def _candidate_bases(puzzle: Puzzle) -> list[int]:
             selected.append(base)
     return selected
 
-def _solve_base(puzzle: Puzzle, base: int) -> tuple[Instruction, ...]:
+def _solve_base(puzzle: Puzzle, base: int, shared_prefix: bool = False) -> tuple[Instruction, ...]:
     missing = set(puzzle.targets) - set(puzzle.starting_values)
     if not missing:
         return ()
@@ -209,7 +241,11 @@ def _solve_base(puzzle: Puzzle, base: int) -> tuple[Instruction, ...]:
         return product
 
     # Build easy targets first so their values become reusable anchors.
-    ordered = sorted(missing, key=lambda value: (estimate(value), value))
+    ordered = (
+        _shared_prefix_order(missing, base, estimate)
+        if shared_prefix
+        else sorted(missing, key=lambda value: (estimate(value), value))
+    )
     for target in ordered:
         if target not in builder.remaining:
             continue
@@ -455,9 +491,19 @@ def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
     if not set(puzzle.targets) - set(puzzle.starting_values):
         return ()
     candidates = []
-    for base in _candidate_bases(puzzle):
+    feasible_bases = _candidate_bases(puzzle)
+    for base in feasible_bases:
         try:
             candidates.append(_solve_base(puzzle, base))
+        except (ValueError, KeyError, RecursionError):
+            continue
+    # A second ordering pass deliberately clusters targets with common
+    # high-order digits so recursive prefix values can be reused.
+    for base in (2, 4, 8, 10, 16, 32):
+        if base not in feasible_bases:
+            continue
+        try:
+            candidates.append(_solve_base(puzzle, base, shared_prefix=True))
         except (ValueError, KeyError, RecursionError):
             continue
     for width in (3, 4, 5, 6, 7, 8):
