@@ -32,6 +32,16 @@ class OfficialLimitTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "UTF-8 bytes"):
                 load_submission(path)
 
+    def test_loader_rejects_rows_with_extra_cells(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "submission.csv"
+            with path.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.writer(handle)
+                writer.writerow(["id", "program"])
+                writer.writerow(["p1", "[]", "unexpected"])
+            with self.assertRaisesRegex(ValueError, "exactly two cells"):
+                load_submission(path)
+
     def test_loader_requires_exact_column_order(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "submission.csv"
