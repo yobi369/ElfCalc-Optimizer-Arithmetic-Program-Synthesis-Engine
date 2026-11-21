@@ -388,6 +388,68 @@ def _solve_signed_window(puzzle: Puzzle, width: int) -> tuple[Instruction, ...]:
     return result
 
 
+def _solve_signed_window_streaming(puzzle: Puzzle, width: int) -> tuple[Instruction, ...]:
+    """Build wider signed-window digits lazily to avoid pinning a large constant table."""
+    missing = set(puzzle.targets) - set(puzzle.starting_values)
+    if not missing:
+        return ()
+    terms = {target: _signed_window_terms(target, width) for target in missing}
+    builder = _RegisterBuilder(puzzle, {1})
+
+    # Cheap target closure can avoid constructing any window constants.
+    changed = True
+    while changed and builder.remaining:
+        changed = False
+        for target in sorted(builder.remaining):
+            recipe = builder.direct(target)
+            if recipe is not None:
+                builder.emit(*recipe)
+                changed = True
+    if not builder.remaining:
+        return tuple(builder.program)
+
+    for target in sorted(missing, key=lambda item: (len(terms[item]), item)):
+        if target not in builder.remaining:
+            continue
+        target_terms = terms[target]
+        if not target_terms or target_terms[0][1] <= 0:
+            raise ValueError("signed representation has no positive leading digit")
+
+        accumulator = builder.ensure_constant(target_terms[0][1])
+        for shift, digit in target_terms[1:]:
+            while shift:
+                step = min(10, shift)
+                factor_value = 1 << step
+                factor = builder.ensure_constant(
+                    factor_value, pinned=frozenset({accumulator})
+                )
+                accumulator = builder.emit(
+                    "*", accumulator, factor, pinned=frozenset({factor})
+                )
+                shift -= step
+            if digit:
+                digit_register = builder.ensure_constant(
+                    abs(digit), pinned=frozenset({accumulator})
+                )
+                accumulator = builder.emit(
+                    "+" if digit > 0 else "-",
+                    accumulator,
+                    digit_register,
+                    pinned=frozenset({digit_register}),
+                )
+
+        if builder.register(target) is None:
+            raise ValueError(f"streaming signed-window construction missed {target}")
+        if len(builder.program) > MAX_INSTRUCTIONS:
+            raise ValueError("streaming signed-window program exceeds instruction limit")
+
+    result = tuple(builder.program)
+    validation = validate_program(puzzle, result)
+    if not validation.complete:
+        raise ValueError(validation.error or "streaming signed-window candidate failed validation")
+    return result
+
+
 def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
     """Try positive-radix and signed-window constructions; retain the shortest."""
     if not set(puzzle.targets) - set(puzzle.starting_values):
@@ -401,6 +463,13 @@ def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
     for width in (3, 4, 5, 6, 7, 8):
         try:
             candidates.append(_solve_signed_window(puzzle, width))
+        except (ValueError, KeyError, RecursionError):
+            continue
+    # Wider windows reduce the number of signed digits. Build their constants
+    # lazily so the 48-register machine is not consumed by a large digit table.
+    for width in (9, 10, 11, 12, 13, 14):
+        try:
+            candidates.append(_solve_signed_window_streaming(puzzle, width))
         except (ValueError, KeyError, RecursionError):
             continue
     candidates = [candidate for candidate in candidates if len(candidate) <= MAX_INSTRUCTIONS]
