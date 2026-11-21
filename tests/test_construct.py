@@ -1,6 +1,10 @@
 import unittest
 
-from elfcalc.construct import _signed_window_terms, solve_constructive
+from elfcalc.construct import (
+    _signed_window_streaming,
+    _signed_window_terms,
+    solve_constructive,
+)
 from elfcalc.puzzle import Puzzle
 from elfcalc.validation import validate_program
 
@@ -16,6 +20,19 @@ class ConstructiveSolverTests(unittest.TestCase):
     def test_signed_window_terms_reconstruct_positive_integers(self):
         for width in (4, 5, 6):
             for value in range(1, 1000):
+                reconstructed = 0
+                for shift, digit in _signed_window_terms(value, width):
+                    reconstructed = (reconstructed << shift) + digit
+                self.assertEqual(reconstructed, value, (width, value))
+
+    def test_streaming_wide_window_candidate_is_valid(self):
+        puzzle = Puzzle("wide_window", (3, 7), (101, 257, 1009), 2000)
+        program = _signed_window_streaming(puzzle, 10)
+        self.assertTrue(validate_program(puzzle, program).complete)
+
+    def test_signed_window_terms_reconstruct_wide_integers(self):
+        for width in (9, 10, 12, 14):
+            for value in (1, 2, 3, 255, 256, 257, 65535, 10**12 + 39):
                 reconstructed = 0
                 for shift, digit in _signed_window_terms(value, width):
                     reconstructed = (reconstructed << shift) + digit
