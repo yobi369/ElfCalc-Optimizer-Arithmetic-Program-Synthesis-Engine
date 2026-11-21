@@ -7,8 +7,17 @@ import json
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from .machine import Instruction
+from .machine import MAX_INSTRUCTIONS, MAX_PROGRAM_BYTES, Instruction
 from .validation import program_from_rows
+
+
+def _program_json(program: Sequence[Instruction]) -> str:
+    if len(program) > MAX_INSTRUCTIONS:
+        raise ValueError(f"program exceeds {MAX_INSTRUCTIONS} instructions")
+    payload = json.dumps(rows_from_program(program), separators=(",", ":"), ensure_ascii=False)
+    if len(payload.encode("utf-8")) > MAX_PROGRAM_BYTES:
+        raise ValueError(f"program exceeds {MAX_PROGRAM_BYTES} UTF-8 bytes")
+    return payload
 
 
 def load_submission(path: str | Path) -> dict[str, tuple[Instruction, ...]]:
@@ -27,8 +36,11 @@ def load_submission(path: str | Path) -> dict[str, tuple[Instruction, ...]]:
                 raise ValueError(f"empty puzzle id at CSV line {line_number}")
             if puzzle_id in programs:
                 raise ValueError(f"duplicate puzzle id {puzzle_id!r}")
+            raw = row["program"]
+            if len(raw.encode("utf-8")) > MAX_PROGRAM_BYTES:
+                raise ValueError(f"program for {puzzle_id!r} exceeds {MAX_PROGRAM_BYTES} UTF-8 bytes")
             try:
-                raw_program = json.loads(row["program"])
+                raw_program = json.loads(raw)
                 if not isinstance(raw_program, list):
                     raise ValueError("program must be a JSON array")
                 programs[puzzle_id] = program_from_rows(raw_program)
@@ -66,7 +78,4 @@ def write_submission(
         writer = csv.DictWriter(handle, fieldnames=["id", "program"], lineterminator="\n")
         writer.writeheader()
         for puzzle_id in puzzle_ids:
-            writer.writerow({
-                "id": puzzle_id,
-                "program": json.dumps(rows_from_program(programs[puzzle_id]), separators=(",", ":")),
-            })
+            writer.writerow({"id": puzzle_id, "program": _program_json(programs[puzzle_id])})
