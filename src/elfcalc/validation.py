@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
-from .machine import ArithmeticMachine, Instruction, MachineError
+from .machine import (
+    MAX_INSTRUCTIONS,
+    MAX_PROGRAM_BYTES,
+    ArithmeticMachine,
+    Instruction,
+    MachineError,
+)
 from .puzzle import Puzzle
 
 
@@ -22,10 +29,33 @@ class ValidationResult:
         return self.valid and not self.missing_targets
 
 
-def validate_program(puzzle: Puzzle, program: Iterable[Instruction]) -> ValidationResult:
-    """Replay every instruction against the puzzle's exact machine constraints."""
-    instructions = tuple(program)
+def _serialized_program_size(instructions: Sequence[Instruction]) -> int:
+    rows = [
+        [instruction.operator, instruction.left, instruction.right, instruction.destination]
+        for instruction in instructions
+    ]
     try:
+        encoded = json.dumps(rows, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise MachineError(f"program cannot be serialized: {exc}") from exc
+    return len(encoded)
+
+
+def validate_program(puzzle: Puzzle, program: Iterable[Instruction]) -> ValidationResult:
+    """Replay every instruction and enforce the competition's structural limits."""
+    try:
+        instructions = tuple(program)
+    except TypeError as exc:
+        return ValidationResult(False, 0, frozenset(), puzzle.targets, str(exc))
+
+    if len(instructions) > MAX_INSTRUCTIONS:
+        return ValidationResult(
+            False, len(instructions), frozenset(), puzzle.targets,
+            f"program exceeds {MAX_INSTRUCTIONS} instructions",
+        )
+    try:
+        if _serialized_program_size(instructions) > MAX_PROGRAM_BYTES:
+            raise MachineError(f"program exceeds {MAX_PROGRAM_BYTES} UTF-8 bytes")
         machine = ArithmeticMachine(
             puzzle.starting_values,
             value_limit=puzzle.value_limit,
@@ -64,4 +94,6 @@ def instruction_from_row(row: Sequence[object]) -> Instruction:
 
 
 def program_from_rows(rows: Sequence[Sequence[object]]) -> tuple[Instruction, ...]:
+    if len(rows) > MAX_INSTRUCTIONS:
+        raise ValueError(f"program exceeds {MAX_INSTRUCTIONS} instructions")
     return tuple(instruction_from_row(row) for row in rows)
