@@ -25,10 +25,8 @@ def load_submission(path: str | Path) -> dict[str, tuple[Instruction, ...]]:
     programs: dict[str, tuple[Instruction, ...]] = {}
     with Path(path).open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
-        required = {"id", "program"}
-        missing = required.difference(reader.fieldnames or ())
-        if missing:
-            raise ValueError(f"submission is missing required columns: {sorted(missing)}")
+        if reader.fieldnames != ["id", "program"]:
+            raise ValueError("submission must have exactly the columns id,program in that order")
 
         for line_number, row in enumerate(reader, start=2):
             puzzle_id = row["id"]
@@ -37,6 +35,8 @@ def load_submission(path: str | Path) -> dict[str, tuple[Instruction, ...]]:
             if puzzle_id in programs:
                 raise ValueError(f"duplicate puzzle id {puzzle_id!r}")
             raw = row["program"]
+            if raw is None:
+                raise ValueError(f"missing program cell at CSV line {line_number}")
             if len(raw.encode("utf-8")) > MAX_PROGRAM_BYTES:
                 raise ValueError(f"program for {puzzle_id!r} exceeds {MAX_PROGRAM_BYTES} UTF-8 bytes")
             try:
