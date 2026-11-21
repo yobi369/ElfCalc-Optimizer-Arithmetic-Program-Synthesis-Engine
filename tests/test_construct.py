@@ -1,6 +1,6 @@
 import unittest
 
-from elfcalc.construct import solve_constructive
+from elfcalc.construct import _signed_window_terms, solve_constructive
 from elfcalc.puzzle import Puzzle
 from elfcalc.validation import validate_program
 
@@ -12,6 +12,14 @@ class ConstructiveSolverTests(unittest.TestCase):
         result = validate_program(puzzle, program)
         self.assertTrue(result.complete, result.error)
         self.assertEqual(len(program), 4)
+
+    def test_signed_window_terms_reconstruct_positive_integers(self):
+        for width in (4, 5, 6):
+            for value in range(1, 1000):
+                reconstructed = 0
+                for shift, digit in _signed_window_terms(value, width):
+                    reconstructed = (reconstructed << shift) + digit
+                self.assertEqual(reconstructed, value, (width, value))
 
     def test_returns_empty_program_when_all_targets_are_initial(self):
         puzzle = Puzzle("already_done", (2, 3), (2, 3), 10)
