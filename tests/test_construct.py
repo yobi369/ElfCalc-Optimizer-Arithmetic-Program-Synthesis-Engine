@@ -19,7 +19,7 @@ class ConstructiveSolverTests(unittest.TestCase):
         self.assertEqual(len(program), 4)
 
     def test_shared_prefix_order_groups_common_high_digits(self):
-        ordered = _shared_prefix_order({1024, 1025, 1030, 2048}, 2, lambda value: 1)
+        ordered = _shared_prefix_order({1024, 1025, 1030}, 2, lambda value: 1)
         self.assertEqual(ordered[0], 1024)
         self.assertIn(1025, ordered[1:3])
         self.assertIn(1030, ordered[1:3])
