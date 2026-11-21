@@ -6,7 +6,7 @@ The objective is to synthesize short arithmetic programs that produce every requ
 
 ## Project status
 
-**Foundation and baseline-ingestion stage — no optimized score claimed.** The repository now contains an exact-arithmetic machine, puzzle parser, independent program validator, and an adapter for the official `id,program` submission CSV. The supplied sample submission has been replayed against all 1,000 scored puzzles outside the repository: all 1,000 programs were valid and complete. The baseline contains 1,490,380 instructions in total (median 1,593 per puzzle). This is a verified local replay result, not a Kaggle leaderboard score.
+**Foundation and baseline-ingestion stage — no optimized score claimed.** The repository now contains an exact-arithmetic machine, puzzle parser, independent program validator, and an adapter for the official `id,program` submission CSV. The supplied sample submission has been replayed against all 1,000 scored puzzles outside the repository: all 1,000 programs were valid and complete. The baseline contains 1,490,379 instructions in total (median 1,593 per puzzle). This is a verified local replay result, not a Kaggle leaderboard score.
 
 ## Engineering principles
 
