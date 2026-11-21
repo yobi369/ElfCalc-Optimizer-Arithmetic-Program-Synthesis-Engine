@@ -6,9 +6,8 @@ import csv
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
-from .machine import REGISTER_COUNT
+from .machine import MAX_VALUE, REGISTER_COUNT
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,8 +33,8 @@ class Puzzle:
             raise ValueError("targets must be in increasing order")
         if len(set(self.targets)) != len(self.targets):
             raise ValueError("targets must not contain duplicates")
-        if type(self.value_limit) is not int or self.value_limit < 1:
-            raise ValueError("value_limit must be a positive integer")
+        if type(self.value_limit) is not int or not 1 <= self.value_limit <= MAX_VALUE:
+            raise ValueError(f"value_limit must be in [1, {MAX_VALUE}]")
         if self.registers != REGISTER_COUNT:
             raise ValueError(f"competition puzzles must have {REGISTER_COUNT} registers")
         if any(value > self.value_limit for value in self.starting_values):
