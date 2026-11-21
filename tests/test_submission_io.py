@@ -23,6 +23,14 @@ class SubmissionIOTests(unittest.TestCase):
         self.assertEqual(loaded["puzzle_b"], program)
         self.assertEqual(loaded["puzzle_a"], ())
 
+    def test_creates_missing_output_directories(self):
+        program = (Instruction(2, 0, "+", 1),)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested" / "output" / "submission.csv"
+            write_submission(path, ["p1"], {"p1": program})
+            self.assertTrue(path.exists())
+            self.assertEqual(load_submission(path)["p1"], program)
+
     def test_rejects_duplicate_ids(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "submission.csv"
