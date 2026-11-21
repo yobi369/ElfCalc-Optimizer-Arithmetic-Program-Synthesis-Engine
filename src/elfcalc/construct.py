@@ -305,4 +305,10 @@ def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
             candidates.append(candidate)
     if not candidates:
         raise ValueError(f"no valid constructive candidate found for {puzzle.puzzle_id}")
-    return min(candidates, key=lambda program: (len(program), program))
+    return min(
+        candidates,
+        key=lambda program: (
+            len(program),
+            tuple((item.operator, item.left, item.right, item.destination) for item in program),
+        ),
+    )
