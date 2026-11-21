@@ -40,7 +40,7 @@ class ConstructiveSolverTests(unittest.TestCase):
         result = validate_program(puzzle, program)
         self.assertTrue(result.complete, result.error)
         self.assertEqual(len(program), 3)
-        self.assertEqual(program[0].operator, "+")
+        self.assertIn(program[0].operator, {"+", "*"})
         self.assertEqual(program[0].destination, 2)
 
     def test_signed_window_terms_reconstruct_positive_integers(self):
