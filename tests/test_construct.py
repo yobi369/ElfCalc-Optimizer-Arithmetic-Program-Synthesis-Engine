@@ -1,6 +1,7 @@
 import unittest
 
 from elfcalc.construct import (
+    _shared_prefix_order,
     _solve_signed_window_streaming,
     _signed_window_terms,
     solve_constructive,
@@ -16,6 +17,19 @@ class ConstructiveSolverTests(unittest.TestCase):
         result = validate_program(puzzle, program)
         self.assertTrue(result.complete, result.error)
         self.assertEqual(len(program), 4)
+
+    def test_shared_prefix_order_groups_common_high_digits(self):
+        ordered = _shared_prefix_order({1024, 1025, 1030, 2048}, 2, lambda value: 1)
+        self.assertEqual(ordered[0], 1024)
+        self.assertIn(1025, ordered[1:3])
+        self.assertIn(1030, ordered[1:3])
+
+    def test_shared_prefix_base_solver_is_valid(self):
+        from elfcalc.construct import _solve_base
+
+        puzzle = Puzzle("shared_prefix", (3, 7), (101, 102, 103, 257, 1009), 2000)
+        program = _solve_base(puzzle, 2, shared_prefix=True)
+        self.assertTrue(validate_program(puzzle, program).complete)
 
     def test_signed_window_terms_reconstruct_positive_integers(self):
         for width in (4, 5, 6):
