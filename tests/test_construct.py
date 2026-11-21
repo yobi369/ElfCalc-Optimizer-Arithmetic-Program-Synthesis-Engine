@@ -31,6 +31,18 @@ class ConstructiveSolverTests(unittest.TestCase):
         program = _solve_base(puzzle, 2, shared_prefix=True)
         self.assertTrue(validate_program(puzzle, program).complete)
 
+
+    def test_shared_intermediate_dag_reuses_one_node_for_multiple_targets(self):
+        from elfcalc.construct import _solve_shared_intermediate_dag
+
+        puzzle = Puzzle("shared_dag", (2, 3), (7, 8), 10)
+        program = _solve_shared_intermediate_dag(puzzle)
+        result = validate_program(puzzle, program)
+        self.assertTrue(result.complete, result.error)
+        self.assertEqual(len(program), 3)
+        self.assertEqual(program[0].operator, "+")
+        self.assertEqual(program[0].destination, 2)
+
     def test_signed_window_terms_reconstruct_positive_integers(self):
         for width in (4, 5, 6):
             for value in range(1, 1000):
