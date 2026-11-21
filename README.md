@@ -44,6 +44,23 @@ python scripts/audit_baseline.py --puzzles data/practice_puzzles.csv --submissio
 
 The constructor portfolio compares a bounded shared-intermediate DAG pass, all feasible positive positional bases from 2 through 32 (with ordinary and shared-prefix target orderings), precomputed signed-window widths 3 through 8, and streaming signed-window widths 9 through 14. Wider windows synthesize digit constants lazily to avoid reserving a large register table. It uses exact integers, bounded intermediate values, direct target closure, difference/factor anchors, and a 48-register allocator. The next engineering stage is to improve shared-intermediate synthesis and optimize the weakest cases.
 
+
+## Benchmark shared-intermediate DAG search
+
+The DAG experiment is independently ablatable from the rest of the solver portfolio. Run it on practice data first:
+
+```bash
+python scripts/benchmark_shared_dag.py --puzzles data/practice_puzzles.csv --output outputs/shared-dag-practice.json
+```
+
+Then run the same comparison on the scored dataset:
+
+```bash
+python scripts/benchmark_shared_dag.py --puzzles data/puzzles.csv --output outputs/shared-dag-scored.json
+```
+
+The report compares the complete constructive portfolio with and without the DAG pass, records per-puzzle instruction counts and the dataset SHA-256, and independently replays both candidates. A DAG pass is retained only if it yields measurable aggregate improvement without validity regressions.
+
 ## Official constraints enforced
 
 - 48 registers, indexed 0 through 47.
