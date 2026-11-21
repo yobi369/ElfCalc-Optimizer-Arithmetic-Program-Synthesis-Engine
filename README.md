@@ -38,7 +38,7 @@ python scripts/audit_baseline.py --puzzles data/puzzles.csv --submission outputs
 To experiment on the labeled practice set without a scored-puzzle fallback:
 
 ```bash
-python scripts/solve_constructive.py --puzzles data/practice_puzzles.csv --fallback "" --output outputs/practice-constructive.csv
+python scripts/solve_constructive.py --puzzles data/practice_puzzles.csv --fallback "" --output outputs/practice-constructive.csv --report outputs/practice-constructive-report.json
 python scripts/audit_baseline.py --puzzles data/practice_puzzles.csv --submission outputs/practice-constructive.csv
 ```
 
