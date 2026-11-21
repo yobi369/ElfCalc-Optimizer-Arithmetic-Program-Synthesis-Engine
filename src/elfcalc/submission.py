@@ -25,7 +25,7 @@ def load_submission(path: str | Path) -> dict[str, tuple[Instruction, ...]]:
     programs: dict[str, tuple[Instruction, ...]] = {}
     # csv's default field cap is 128 KiB and raises before our own byte-limit
     # check can produce a useful, domain-specific error.
-    csv.field_size_limit(MAX_PROGRAM_BYTES + 1)
+    csv.field_size_limit(MAX_PROGRAM_BYTES * 2)
     with Path(path).open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         if reader.fieldnames != ["id", "program"]:
