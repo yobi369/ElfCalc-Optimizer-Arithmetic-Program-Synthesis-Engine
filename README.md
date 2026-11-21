@@ -6,7 +6,25 @@ The objective is to synthesize short arithmetic programs that produce every requ
 
 ## Project status
 
-**Foundation and baseline-ingestion stage — no optimized score claimed.** The repository now contains an exact-arithmetic machine, puzzle parser, independent program validator, and an adapter for the official `id,program` submission CSV. The supplied sample submission has been replayed against all 1,000 scored puzzles outside the repository: all 1,000 programs were valid and complete. The baseline contains 1,490,379 instructions in total (median 1,593 per puzzle). This is a verified local replay result, not a Kaggle leaderboard score.
+**Baseline audit tooling added; solver optimization not yet implemented.** The repository contains an exact-arithmetic machine, puzzle parser, independent program validator, official submission CSV adapter, and a reproducible baseline audit command.
+
+The supplied sample submission was independently replayed against all 1,000 scored puzzles: all 1,000 programs were valid and complete. The baseline contains 1,490,379 instructions in total (median 1,593 per puzzle). This is a local replay result, not a Kaggle leaderboard score. The repository audit command is now the canonical way to reproduce the check from the official CSV files.
+
+## Reproduce the baseline audit
+
+Place the official files in `data/` (the directory is git-ignored), then run:
+
+```bash
+python scripts/audit_baseline.py
+```
+
+Or supply explicit paths:
+
+```bash
+python scripts/audit_baseline.py --puzzles data/puzzles.csv --submission data/sample_submission.csv
+```
+
+The command checks that puzzle and submission IDs match, replays every instruction under the exact machine rules, and reports validity, target completeness, and instruction-count statistics. It exits with status 0 only when every program is valid and complete; it exits 1 for invalid/incomplete programs and 2 for input/schema errors.
 
 ## Engineering principles
 
@@ -25,9 +43,11 @@ The objective is to synthesize short arithmetic programs that produce every requ
 | `src/elfcalc/puzzle.py` | Puzzle model and official puzzle CSV parsing |
 | `src/elfcalc/validation.py` | Independent replay validation and official instruction-row conversion |
 | `src/elfcalc/submission.py` | Official submission CSV loading and writing |
+| `src/elfcalc/audit.py` | Reproducible full-submission replay and aggregate audit |
+| `scripts/audit_baseline.py` | Command-line baseline/candidate audit |
+| `tests/` | Unit, parser, audit, and regression tests |
 | `src/elfcalc/construct.py` | Planned constructive solver |
 | `src/elfcalc/optimize.py` | Planned search and instruction-count reduction |
-| `tests/` | Unit, parser, and regression tests |
 | `experiments/` | Reproducible optimization experiments |
 
 ## Development setup
