@@ -32,6 +32,8 @@ def load_submission(path: str | Path) -> dict[str, tuple[Instruction, ...]]:
             raise ValueError("submission must have exactly the columns id,program in that order")
 
         for line_number, row in enumerate(reader, start=2):
+            if None in row or any(value is None for value in row.values()):
+                raise ValueError(f"submission row {line_number} must contain exactly two cells")
             puzzle_id = row["id"]
             if not puzzle_id:
                 raise ValueError(f"empty puzzle id at CSV line {line_number}")
