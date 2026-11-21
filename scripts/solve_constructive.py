@@ -31,6 +31,13 @@ def main() -> int:
 
     for index, puzzle in enumerate(puzzles, start=1):
         baseline = fallback.get(puzzle.puzzle_id)
+        if baseline is not None:
+            baseline_check = validate_program(puzzle, baseline)
+            if not baseline_check.complete:
+                raise ValueError(
+                    f"fallback program for {puzzle.puzzle_id} is invalid: "
+                    f"{baseline_check.error or baseline_check.missing_targets}"
+                )
         try:
             candidate = solve_constructive(puzzle)
             check = validate_program(puzzle, candidate)
