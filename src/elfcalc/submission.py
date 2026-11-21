@@ -23,6 +23,9 @@ def _program_json(program: Sequence[Instruction]) -> str:
 def load_submission(path: str | Path) -> dict[str, tuple[Instruction, ...]]:
     """Load the official two-column id,program submission format."""
     programs: dict[str, tuple[Instruction, ...]] = {}
+    # csv's default field cap is 128 KiB and raises before our own byte-limit
+    # check can produce a useful, domain-specific error.
+    csv.field_size_limit(MAX_PROGRAM_BYTES + 1)
     with Path(path).open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         if reader.fieldnames != ["id", "program"]:
