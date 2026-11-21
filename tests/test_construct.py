@@ -1,7 +1,7 @@
 import unittest
 
 from elfcalc.construct import (
-    _signed_window_streaming,
+    _solve_signed_window_streaming,
     _signed_window_terms,
     solve_constructive,
 )
@@ -27,7 +27,7 @@ class ConstructiveSolverTests(unittest.TestCase):
 
     def test_streaming_wide_window_candidate_is_valid(self):
         puzzle = Puzzle("wide_window", (3, 7), (101, 257, 1009), 2000)
-        program = _signed_window_streaming(puzzle, 10)
+        program = _solve_signed_window_streaming(puzzle, 10)
         self.assertTrue(validate_program(puzzle, program).complete)
 
     def test_signed_window_terms_reconstruct_wide_integers(self):
