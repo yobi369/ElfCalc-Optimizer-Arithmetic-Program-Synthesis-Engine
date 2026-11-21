@@ -6,7 +6,7 @@ The objective is to synthesize short arithmetic programs that produce every requ
 
 ## Project status
 
-**Exact validator, reproducible baseline audit, and constructive solver implemented.** The solver searches every feasible positional base from 2 through 32 and signed binary-window widths 3 through 8, reuses intermediate values, and validates candidates with an independent exact-arithmetic replay.
+**Exact validator, reproducible baseline audit, and constructive solver implemented.** The solver searches every feasible positional base from 2 through 32, precomputed signed-window widths 3 through 8, and streaming signed-window widths 9 through 14, reusing intermediate values, and validates candidates with an independent exact-arithmetic replay.
 
 A full local run on the supplied scored dataset produced a 1,000-program candidate with **275,767 total instructions**. All 1,000 programs replayed successfully and covered every target; the longest program has 548 instructions. The official sample baseline has 1,490,379 instructions, so this candidate reduces the local instruction total by 1,214,612 (81.50%). On the 200 labeled practice puzzles, the same portfolio produced 55,946 instructions. These are locally measured candidate results, **not Kaggle leaderboard scores** and not claims of global optimality. The CSV candidate and its verification report are generated locally and are not committed with competition data.
 
@@ -42,7 +42,7 @@ python scripts/solve_constructive.py --puzzles data/practice_puzzles.csv --fallb
 python scripts/audit_baseline.py --puzzles data/practice_puzzles.csv --submission outputs/practice-constructive.csv
 ```
 
-The constructor portfolio compares all feasible positive positional bases from 2 through 32 with signed binary-window widths 3 through 8. It uses exact integers, bounded intermediate values, direct target closure, difference/factor anchors, and a 48-register allocator. The next engineering stage is to improve shared-intermediate synthesis and optimize the weakest cases.
+The constructor portfolio compares all feasible positive positional bases from 2 through 32, precomputed signed-window widths 3 through 8, and streaming signed-window widths 9 through 14. Wider windows synthesize digit constants lazily to avoid reserving a large register table. It uses exact integers, bounded intermediate values, direct target closure, difference/factor anchors, and a 48-register allocator. The next engineering stage is to improve shared-intermediate synthesis and optimize the weakest cases.
 
 ## Official constraints enforced
 
