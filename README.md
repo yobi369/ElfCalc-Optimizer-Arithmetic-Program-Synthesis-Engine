@@ -6,7 +6,7 @@ The objective is to synthesize short arithmetic programs that produce every requ
 
 ## Project status
 
-**Bootstrap stage — no competition score claimed yet.** This repository was created for Brian Mutunga's independent implementation. The first milestone is a trustworthy exact-arithmetic execution and validation core; optimization comes only after the interpreter is tested against the official specification and sample data.
+**Foundation and baseline-ingestion stage — no optimized score claimed.** The repository now contains an exact-arithmetic machine, puzzle parser, independent program validator, and an adapter for the official `id,program` submission CSV. The supplied sample submission has been replayed against all 1,000 scored puzzles outside the repository: all 1,000 programs were valid and complete. The baseline contains 1,490,380 instructions in total (median 1,593 per puzzle). This is a verified local replay result, not a Kaggle leaderboard score.
 
 ## Engineering principles
 
@@ -17,16 +17,17 @@ The objective is to synthesize short arithmetic programs that produce every requ
 - Record dataset hashes, solver version, per-puzzle instruction counts, and reproducible experiment settings.
 - Never report a score or leaderboard result that has not been confirmed by Kaggle.
 
-## Planned architecture
+## Architecture
 
 | Component | Responsibility |
 | --- | --- |
 | `src/elfcalc/machine.py` | Deterministic exact-arithmetic virtual machine |
-| `src/elfcalc/validation.py` | Program, register, target, and constraint validation |
-| `src/elfcalc/construct.py` | Initial constructive solver |
-| `src/elfcalc/optimize.py` | Local search and instruction-count reduction |
-| `src/elfcalc/io.py` | Competition CSV/JSON input and output |
-| `tests/` | Unit, property-style, and regression tests |
+| `src/elfcalc/puzzle.py` | Puzzle model and official puzzle CSV parsing |
+| `src/elfcalc/validation.py` | Independent replay validation and official instruction-row conversion |
+| `src/elfcalc/submission.py` | Official submission CSV loading and writing |
+| `src/elfcalc/construct.py` | Planned constructive solver |
+| `src/elfcalc/optimize.py` | Planned search and instruction-count reduction |
+| `tests/` | Unit, parser, and regression tests |
 | `experiments/` | Reproducible optimization experiments |
 
 ## Development setup
@@ -54,7 +55,7 @@ Keep credentials, downloaded competition data, generated submissions, and experi
 - [Competition data](https://www.kaggle.com/competitions/santa-2026/data)
 - [Competition rules](https://www.kaggle.com/competitions/santa-2026/rules)
 
-The email invitation lists **21 January 2027** as the entry deadline. The currently indexed competition schedule lists **28 January 2027** as the competition close; verify the authoritative Kaggle page before relying on either date.
+The email invitation lists **21 January 2027** as the entry deadline. The competition page's schedule is authoritative; verify it before relying on either date.
 
 ## License
 
