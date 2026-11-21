@@ -63,7 +63,7 @@ def write_submission(
         raise ValueError("puzzle_ids contains duplicates")
 
     with Path(path).open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["id", "program"], lineterminator="\\n")
+        writer = csv.DictWriter(handle, fieldnames=["id", "program"], lineterminator="\n")
         writer.writeheader()
         for puzzle_id in puzzle_ids:
             writer.writerow({
