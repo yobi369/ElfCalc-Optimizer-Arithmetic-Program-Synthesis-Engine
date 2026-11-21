@@ -567,15 +567,16 @@ def _solve_shared_intermediate_dag(puzzle: Puzzle) -> tuple[Instruction, ...]:
     return result
 
 
-def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
+def solve_constructive(puzzle: Puzzle, include_shared_dag: bool = True) -> tuple[Instruction, ...]:
     """Try positive-radix and signed-window constructions; retain the shortest."""
     if not set(puzzle.targets) - set(puzzle.starting_values):
         return ()
     candidates = []
-    try:
-        candidates.append(_solve_shared_intermediate_dag(puzzle))
-    except (ValueError, KeyError, RecursionError):
-        pass
+    if include_shared_dag:
+        try:
+            candidates.append(_solve_shared_intermediate_dag(puzzle))
+        except (ValueError, KeyError, RecursionError):
+            pass
     feasible_bases = _candidate_bases(puzzle)
     for base in feasible_bases:
         try:
