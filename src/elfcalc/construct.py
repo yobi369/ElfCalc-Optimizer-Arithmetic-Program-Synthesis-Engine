@@ -291,18 +291,129 @@ def _solve_base(puzzle: Puzzle, base: int) -> tuple[Instruction, ...]:
     return result
 
 
+def _signed_window_terms(value: int, width: int) -> list[tuple[int, int]]:
+    """Encode a positive integer as high-to-low signed odd binary windows."""
+    digits = []
+    modulus = 1 << width
+    while value:
+        digit = 0
+        if value & 1:
+            digit = value % modulus
+            if digit >= modulus // 2:
+                digit -= modulus
+            value -= digit
+        digits.append(digit)
+        value //= 2
+
+    positions = [index for index in range(len(digits) - 1, -1, -1) if digits[index]]
+    if not positions:
+        return []
+    terms = [(0, digits[positions[0]])]
+    previous = positions[0]
+    for position in positions[1:]:
+        terms.append((previous - position, digits[position]))
+        previous = position
+    if previous:
+        terms.append((previous, 0))
+    return terms
+
+
+def _solve_signed_window(puzzle: Puzzle, width: int) -> tuple[Instruction, ...]:
+    missing = set(puzzle.targets) - set(puzzle.starting_values)
+    if not missing:
+        return ()
+    terms = {target: _signed_window_terms(target, width) for target in missing}
+    needed = {1}
+    for target_terms in terms.values():
+        for shift, digit in target_terms:
+            if digit:
+                needed.add(abs(digit))
+            while shift:
+                step = min(10, shift)
+                needed.add(1 << step)
+                shift -= step
+
+    if len(puzzle.starting_values) + len(needed - set(puzzle.starting_values)) + 4 > puzzle.registers:
+        raise ValueError("signed-window constants leave too few scratch registers")
+
+    builder = _RegisterBuilder(puzzle, needed)
+    changed = True
+    while changed and builder.remaining:
+        changed = False
+        for target in sorted(builder.remaining):
+            recipe = builder.direct(target)
+            if recipe is not None:
+                builder.emit(*recipe)
+                changed = True
+    if not builder.remaining:
+        return tuple(builder.program)
+
+    for constant in sorted(needed):
+        builder.ensure_constant(constant)
+        if not builder.remaining:
+            return tuple(builder.program)
+
+    for target in sorted(missing, key=lambda item: (len(terms[item]), item)):
+        if target not in builder.remaining:
+            continue
+        recipe = builder.direct(target)
+        if recipe is not None:
+            builder.emit(*recipe)
+            continue
+        target_terms = terms[target]
+        if not target_terms or target_terms[0][1] <= 0:
+            raise ValueError("signed representation has no positive leading digit")
+        accumulator = builder.ensure_constant(target_terms[0][1])
+        for shift, digit in target_terms[1:]:
+            while shift:
+                step = min(10, shift)
+                factor = builder.register(1 << step)
+                if factor is None:
+                    factor = builder.ensure_constant(1 << step, frozenset({accumulator}))
+                accumulator = builder.emit("*", accumulator, factor, pinned=frozenset({factor}))
+                shift -= step
+            if digit:
+                constant = builder.register(abs(digit))
+                if constant is None:
+                    constant = builder.ensure_constant(abs(digit), frozenset({accumulator}))
+                accumulator = builder.emit(
+                    "+" if digit > 0 else "-",
+                    accumulator,
+                    constant,
+                    pinned=frozenset({constant}),
+                )
+        if target not in builder.locations:
+            raise ValueError(f"signed-window construction did not produce target {target}")
+        if not builder.remaining:
+            break
+        if len(builder.program) > MAX_INSTRUCTIONS:
+            raise ValueError("signed-window program exceeds the instruction limit")
+
+    if builder.remaining:
+        raise ValueError(f"signed-window solver missed targets: {sorted(builder.remaining)}")
+    result = tuple(builder.program)
+    validation = validate_program(puzzle, result)
+    if not validation.complete:
+        raise ValueError(validation.error or "signed-window program failed validation")
+    return result
+
+
 def solve_constructive(puzzle: Puzzle) -> tuple[Instruction, ...]:
-    """Try a deterministic portfolio of positional bases and return its shortest result."""
+    """Try positive-radix and signed-window constructions; retain the shortest."""
     if not set(puzzle.targets) - set(puzzle.starting_values):
         return ()
     candidates = []
     for base in _candidate_bases(puzzle):
         try:
-            candidate = _solve_base(puzzle, base)
+            candidates.append(_solve_base(puzzle, base))
         except (ValueError, KeyError, RecursionError):
             continue
-        if len(candidate) <= MAX_INSTRUCTIONS:
-            candidates.append(candidate)
+    for width in (4, 5, 6):
+        try:
+            candidates.append(_solve_signed_window(puzzle, width))
+        except (ValueError, KeyError, RecursionError):
+            continue
+    candidates = [candidate for candidate in candidates if len(candidate) <= MAX_INSTRUCTIONS]
     if not candidates:
         raise ValueError(f"no valid constructive candidate found for {puzzle.puzzle_id}")
     return min(
