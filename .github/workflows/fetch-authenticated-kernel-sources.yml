@@ -1,0 +1,53 @@
+name: Fetch authenticated Kaggle solver notebook sources
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Kaggle CLI
+        run: python -m pip install --upgrade kaggle
+
+      - name: Pull public solver notebook source and metadata
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${KAGGLE_API_TOKEN:-}" ]; then
+            echo "KAGGLE_API_TOKEN secret is not configured."
+            echo "Create a Kaggle API token at https://www.kaggle.com/settings/api and add it to GitHub repository Settings > Secrets and variables > Actions as KAGGLE_API_TOKEN."
+            exit 0
+          fi
+          mkdir -p bundle
+          slugs=(
+            "atakanaldemir/santa-2026-joint-recipes-for-large-puzzles"
+            "pablodiegoo/santa-2026-deterministic-atlas-solver"
+            "royalacecat/elf-calculator-residual-cut-search"
+            "prvsiyan/santa-2026-elf-calculator"
+            "romanrozen/santa-2026-elf-calculator"
+            "mizeroluckygall/elf-calculator-best-of-public-merge-polish"
+            "goodpjw2008/santa-2026-lns-cp-sat-recombine-lb-134-092"
+            "alexchilton/rudolph-the-red-nosed-register-allocator"
+            "ozertuu/santa-2026-starter-notebook"
+          )
+          for slug in "${slugs[@]}"; do
+            name="${slug//\//-}"
+            mkdir -p "bundle/$name"
+            echo "Pulling $slug"
+            kaggle kernels pull "$slug" --path "bundle/$name" --metadata
+          done
+          find bundle -type f -maxdepth 3 -print0 | sort -z | xargs -0 sha256sum > bundle/SHA256SUMS.txt
+
+      - name: Upload authenticated notebook source bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: santa-authenticated-kernel-sources
+          path: bundle/
+          retention-days: 30
