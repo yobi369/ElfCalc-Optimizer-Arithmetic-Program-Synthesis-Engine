@@ -129,10 +129,10 @@ jobs:
               p = puzzles[pid]
               old = programs[pid]
               header = (f"{pid} {p['limit']} {len(p['seeds'])} "
-                        f"{len(p['targets'])} {len(old)}\\n")
-              body = " ".join(map(str, p["seeds"])) + "\\n"
-              body += " ".join(map(str, p["targets"])) + "\\n"
-              body += "".join(f"{op} {a} {b} {d}\\n" for op, a, b, d in old)
+                        f"{len(p['targets'])} {len(old)}\n")
+              body = " ".join(map(str, p["seeds"])) + "\n"
+              body += " ".join(map(str, p["targets"])) + "\n"
+              body += "".join(f"{op} {a} {b} {d}\n" for op, a, b, d in old)
               started = time.time()
               try:
                   result = subprocess.run([binary, *args], input=header + body,
@@ -187,13 +187,13 @@ jobs:
           replay_all()
 
           with open("outputs/atakan-full-search.csv", "w", newline="", encoding="utf-8") as f:
-              writer = csv.writer(f, lineterminator="\\n")
+              writer = csv.writer(f, lineterminator="\n")
               writer.writerow(["id", "program"])
               for pid in puzzles:
                   writer.writerow([pid, json.dumps(best[pid], separators=(",", ":"))])
 
           with open("outputs/atakan-full-search-origins.csv", "w", newline="", encoding="utf-8") as f:
-              writer = csv.writer(f, lineterminator="\\n")
+              writer = csv.writer(f, lineterminator="\n")
               writer.writerow(["id", "selected_source", "instructions"])
               for pid in puzzles:
                   writer.writerow([pid, origins[pid], len(best[pid])])
@@ -221,9 +221,9 @@ jobs:
               "status": "Locally replay-validated; not submitted to Kaggle."
           }
           Path("outputs/atakan-full-search-report.json").write_text(
-              json.dumps(report, indent=2)+"\\n", encoding="utf-8")
+              json.dumps(report, indent=2)+"\n", encoding="utf-8")
           Path("outputs/atakan-full-search-run-summary.txt").write_text(
-              "\\n".join(f"{pid},{name},{saving}" for pid,name,saving in gains)+"\\n",
+              "\n".join(f"{pid},{name},{saving}" for pid,name,saving in gains)+"\n",
               encoding="utf-8")
           print(json.dumps(report, indent=2), flush=True)
           PY
