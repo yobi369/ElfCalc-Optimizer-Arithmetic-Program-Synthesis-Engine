@@ -87,7 +87,20 @@ jobs:
           old = 'r = recombine(p, rec, best[pid], tl, order_prog='
           new = 'r = recombine(p, rec, best[pid], tl, cross=False, bridge=False, order_prog='
           assert old in s
-          p.write_text(s.replace(old, new))
+          s = s.replace(old, new)
+          old_return = 'return prog, int(s.ObjectiveValue()), s.StatusName(st), len(V), sum(len(r) for r in rec_by_v.values())'
+          new_return = 'return prog, int(s.ObjectiveValue()), s.StatusName(st), len(V), sum(len(r) for r in rec_by_v.values()), chosen, level'
+          assert old_return in s
+          s = s.replace(old_return, new_return)
+          old_unpack = 'prog, obj, status, nv, nr = r'
+          new_unpack = 'prog, obj, status, nv, nr, chosen, level = r'
+          assert old_unpack in s
+          s = s.replace(old_unpack, new_unpack)
+          old_print = 'print(f"{pid} best {len(best[pid])} cp-sat {obj} ({status}, |V|={nv}, recipes={nr}) scheduled {ok} {time.time() - t0:.1f}s", flush=True)'
+          new_print = old_print + '\\n        if prog is None:\\n            with open(dumps + ".dags", "a") as dag_file:\\n                dag_file.write(json.dumps({"id": pid, "chosen": {str(v): list(r) for v, r in chosen.items()}, "level": {str(v): int(l) for v, l in level.items()}}) + "\\\\n")'
+          assert old_print in s
+          s = s.replace(old_print, new_print)
+          p.write_text(s)
           PY
           cp data/puzzles.csv /tmp/goodpjw/data/puzzles.csv
           cp outputs/baseline-131052.csv /tmp/goodpjw/work/baseline.csv
