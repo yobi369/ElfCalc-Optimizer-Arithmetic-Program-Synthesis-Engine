@@ -1,0 +1,46 @@
+name: Fetch attributed 132477 frontier
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fetch-132477-frontier.yml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve upstream candidate and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          base="https://raw.githubusercontent.com/Hansen0223/Santa_2026/main"
+          curl --fail --location --retry 3 "$base/public-assisted/submission.csv" -o bundle/submission.csv
+          curl --fail --location --retry 3 "$base/public-assisted/origins.csv" -o bundle/origins.csv
+          curl --fail --location --retry 3 "$base/public-assisted/releases/portfolio.json" -o bundle/portfolio.json
+          curl --fail --location --retry 3 "$base/public-assisted/NOTICE.md" -o bundle/NOTICE.md
+          actual="$(sha256sum bundle/submission.csv | awk '{print $1}')"
+          expected="b7964c329818eadc9fab3a75d5d9fcce813a9c15fe5f799dcc580619022a8f60"
+          test "$actual" = "$expected"
+          python - <<'PY'
+          import csv, json
+          p = "bundle/submission.csv"
+          with open(p, encoding="utf-8", newline="") as f:
+              rows = list(csv.DictReader(f))
+          assert len(rows) == 1000, len(rows)
+          assert set(rows[0]) == {"id", "program"}
+          ids = {r["id"] for r in rows}
+          assert len(ids) == 1000
+          print("rows=1000; schema=id,program; sha256 verified")
+          PY
+      - name: Upload attributed frontier bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: attributed-frontier-132477
+          path: bundle/
+          retention-days: 30
