@@ -2,6 +2,9 @@ name: Full-dataset Atakan frontier and interface-closure search
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/experiment-atakan-full.yml"
 
 permissions:
   contents: read
