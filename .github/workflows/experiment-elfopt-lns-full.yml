@@ -77,8 +77,8 @@ jobs:
 
       - name: Run two register-aware LNS configurations on all 1,000 puzzles
         env:
-          LNS_SECONDS: ${{ github.event.inputs.seconds || '2' }}
-          EXTERNAL_TIMEOUT: ${{ github.event.inputs.external_timeout || '6' }}
+          LNS_SECONDS: ${{ github.event.inputs.seconds || '4' }}
+          EXTERNAL_TIMEOUT: ${{ github.event.inputs.external_timeout || '10' }}
           WORKERS: ${{ github.event.inputs.workers || '2' }}
         run: |
           python - <<'PY'
