@@ -1,0 +1,38 @@
+name: Retrieve pinned upstream optimizer research source
+
+on:
+  push:
+    paths:
+      - ".github/workflows/fetch-upstream-research.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch pinned Apache-2.0 upstream source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p upstream
+          curl --fail --location --retry 3 \
+            https://api.github.com/repos/Juan-Severiano/santa-2026/tarball/ac55f36a508add0eb121b57f69a584ea90be49a1 \
+            -o upstream/santa-2026-source.tar.gz
+          mkdir -p upstream/extracted
+          tar -xzf upstream/santa-2026-source.tar.gz -C upstream/extracted --strip-components=1
+          test -s upstream/extracted/cpp/beam_search.cpp
+          test -s upstream/extracted/scripts/build_cpp.py
+          test -s upstream/extracted/THIRD_PARTY.md
+          cp upstream/extracted/THIRD_PARTY.md upstream/UPSTREAM-THIRD_PARTY.md
+          cp upstream/extracted/licenses/Apache-2.0.txt upstream/Apache-2.0.txt
+          echo "Pinned source commit: ac55f36a508add0eb121b57f69a584ea90be49a1"
+      - name: Upload pinned source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-optimizer-source-ac55f36
+          path: upstream/
+          if-no-files-found: error
+          retention-days: 30
