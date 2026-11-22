@@ -39,6 +39,8 @@ The current public standings snapshot checked on 22 November listed leading scor
 
 The current dataset-level score floor and hardest-puzzle triage are documented in [the score-landscape report](research/score-landscape-2026-11-22.md). Reproduce the replay audit and per-puzzle breakdown with [analyze_score_landscape.py](scripts/analyze_score_landscape.py).
 
+The latest local attributed per-puzzle portfolio is **132,428 instructions**, independently replayed on all 1,000 puzzles. It is a minimum merge of the public 132,515 and 132,477 references, not an original solver score. See [portfolio report](research/portfolio-132428.md), [eight selected rows](research/portfolio-132428-improvements.csv), and preserved upstream notices under `research/upstream/`.
+
 ## Reproduce the baseline audit
 
 Place the official files in `data/` (the directory is git-ignored), then run:
@@ -154,5 +156,3 @@ The email invitation lists **21 January 2027** as the entry deadline. The compet
 
 To be selected after reviewing the competition rules and any third-party solver code used. The current constructor is independently implemented; no third-party implementation is vendored.
 
-
-<!-- workflow trigger -->
