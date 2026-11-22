@@ -1,0 +1,215 @@
+name: Full-dataset GoodPJW LNS search
+
+on:
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: Internal LNS seconds per puzzle and seed
+        required: false
+        default: "2"
+      external_timeout:
+        description: Hard timeout per puzzle/seed in seconds
+        required: false
+        default: "6"
+      workers:
+        description: Parallel worker processes
+        required: false
+        default: "2"
+  push:
+    paths:
+      - ".github/workflows/experiment-elfopt-lns-full.yml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  lns:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project validator
+        run: python -m pip install -e .
+
+      - name: Fetch pinned source and rebuild 131052 baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/santa /tmp/santa/asterios /tmp/santa/ishan /tmp/santa/goodpjw data outputs
+          base="https://www.kaggle.com/api/v1/datasets/download"
+          curl --fail --location --retry 3 "$base/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=297" -o /tmp/santa/asterios-v297.zip
+          curl --fail --location --retry 3 "$base/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=18" -o /tmp/santa/ishan-v18.zip
+          curl --fail --location --retry 3 "$base/goodpjw2008/santa-2026-dag-lns-programs?datasetVersionNumber=151" -o /tmp/santa/goodpjw-v151.zip
+          curl --fail --location --retry 3 "https://raw.githubusercontent.com/Juan-Severiano/santa-2026/main/checkpoints/132515.csv.gz" -o /tmp/santa/juan-132515.csv.gz
+
+          echo "989370548e0a2046d1e70220c95c6bbd3767fd7133c8d7a441517b77ad00ef5e  /tmp/santa/asterios-v297.zip" | sha256sum -c -
+          echo "2ae181390221a9b4e212ea2d43628059e0d6024ec2c0fae7748b36f2e0559831  /tmp/santa/ishan-v18.zip" | sha256sum -c -
+          echo "581586ddc71414c3370ddc238fed1a24c94581d845d961ca178aaf0551842fa8  /tmp/santa/goodpjw-v151.zip" | sha256sum -c -
+          echo "851c86928bab87dff1c8569046de1cc8d1568618f4b8904cf59bc0d80689b323  /tmp/santa/juan-132515.csv.gz" | sha256sum -c -
+
+          unzip -q /tmp/santa/asterios-v297.zip -d /tmp/santa/asterios
+          unzip -q /tmp/santa/ishan-v18.zip -d /tmp/santa/ishan
+          unzip -q /tmp/santa/goodpjw-v151.zip -d /tmp/santa/goodpjw
+          gzip -dc /tmp/santa/juan-132515.csv.gz > /tmp/santa/juan-132515.csv
+          cp /tmp/santa/asterios/puzzles.csv data/puzzles.csv
+          echo "b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428  data/puzzles.csv" | sha256sum -c -
+
+          python scripts/merge_attributed_frontiers.py \
+            --puzzles data/puzzles.csv \
+            --first /tmp/santa/juan-132515.csv \
+            --second /tmp/santa/ishan/submission.csv \
+            --first-name "Juan-Severiano checkpoint 132515" \
+            --second-name "Ishan Karnick frontier v18" \
+            --output outputs/baseline-131052.csv \
+            --origins outputs/baseline-origins.csv \
+            --report outputs/baseline-report.json
+
+          g++ -std=c++17 -O3 -march=native -DNDEBUG -o /tmp/santa/elfopt /tmp/santa/goodpjw/elfopt.cpp
+          sha256sum /tmp/santa/elfopt | tee outputs/elfopt-binary.sha256
+          cp research/upstream/goodpjw-v151-recombine-ATTRIBUTION.md outputs/GoodPJW-optimizer-ATTRIBUTION.md
+          cp licenses/Apache-2.0.txt outputs/Apache-2.0.txt
+
+      - name: Run two register-aware LNS configurations on all 1,000 puzzles
+        env:
+          LNS_SECONDS: ${{ github.event.inputs.seconds || '2' }}
+          EXTERNAL_TIMEOUT: ${{ github.event.inputs.external_timeout || '6' }}
+          WORKERS: ${{ github.event.inputs.workers || '2' }}
+        run: |
+          python - <<'PY'
+          import csv, json, os, subprocess, concurrent.futures, time, hashlib
+          from pathlib import Path
+
+          def load_json_ints(value):
+              return json.loads(value)
+
+          puzzles={}
+          with open('data/puzzles.csv',newline='',encoding='utf-8-sig') as f:
+              for r in csv.DictReader(f):
+                  puzzles[r['id']] = {
+                      'seeds': load_json_ints(r['starting_values']),
+                      'targets': sorted(load_json_ints(r['targets'])),
+                      'limit': int(r['value_limit']),
+                      'registers': int(r['registers']),
+                  }
+          baseline={}
+          with open('outputs/baseline-131052.csv',newline='',encoding='utf-8') as f:
+              for r in csv.DictReader(f): baseline[r['id']] = json.loads(r['program'])
+
+          configs=[
+              ('seed0-g3-o3', ['--seed','0','--group','3','--orders','3','--pairs','1','--helpers','1','--kicks','1','--kslack','1']),
+              ('seed1-g4-o4', ['--seed','1','--group','4','--orders','4','--pairs','2','--helpers','1','--kicks','2','--kslack','2']),
+          ]
+          binary='/tmp/santa/elfopt'
+          seconds=os.environ.get('LNS_SECONDS','2')
+          hard_timeout=float(os.environ.get('EXTERNAL_TIMEOUT','6'))
+          jobs=[]
+          for pid,p in puzzles.items():
+              for name,args in configs:
+                  jobs.append((pid,p,baseline[pid],name,args))
+
+          def validate(pid,p,prog):
+              regs=[None]*p['registers']
+              regs[:len(p['seeds'])]=p['seeds']
+              seen=set(p['seeds'])
+              for ins in prog:
+                  op,a,b,d=ins
+                  if not (0<=a<len(regs) and 0<=b<len(regs) and 0<=d<len(regs)): return False
+                  x,y=regs[a],regs[b]
+                  if x is None or y is None: return False
+                  if op=='+': z=x+y
+                  elif op=='-': z=x-y
+                  elif op=='*': z=x*y
+                  elif op=='/':
+                      if y==0 or x%y: return False
+                      z=x//y
+                  else: return False
+                  if z<=0 or z>p['limit']: return False
+                  regs[d]=z; seen.add(z)
+              return set(p['targets']).issubset(seen)
+
+          def worker(job):
+              pid,p,program,name,args=job
+              head=(f"P {pid} {len(p['seeds'])} "+" ".join(map(str,p['seeds']))+
+                    f" {len(p['targets'])} "+" ".join(map(str,p['targets']))+
+                    f" {p['limit']} {p['registers']} {len(program)}\n")
+              body="".join(f"{op} {a} {b} {d}\n" for op,a,b,d in program)
+              cmd=[binary,'--time',seconds]+args
+              t0=time.time()
+              try:
+                  result=subprocess.run(cmd,input=head+body,text=True,capture_output=True,timeout=hard_timeout)
+                  stdout=result.stdout.strip().splitlines()
+                  if result.returncode!=0:
+                      return pid,name,None,{'status':'error','returncode':result.returncode,'seconds':round(time.time()-t0,2),'stderr':result.stderr[-1000:]}
+                  if not stdout or not stdout[0].startswith('R '):
+                      return pid,name,None,{'status':'no-improvement','seconds':round(time.time()-t0,2)}
+                  fields=stdout[0].split()
+                  if len(fields)<4 or fields[1]!=pid:
+                      return pid,name,None,{'status':'parse-error','stdout':result.stdout[:1000]}
+                  old_n,new_n=int(fields[2]),int(fields[3])
+                  candidate=[]
+                  for line in stdout[1:]:
+                      parts=line.split()
+                      if len(parts)!=4: continue
+                      op,a,b,d=parts
+                      candidate.append([op,int(a),int(b),int(d)])
+                  if len(candidate)!=new_n or new_n>=len(program) or not validate(pid,p,candidate):
+                      return pid,name,None,{'status':'invalid-or-not-shorter','reported_new':new_n,'parsed':len(candidate),'seconds':round(time.time()-t0,2)}
+                  return pid,name,candidate,{'status':'improved','old':len(program),'new':len(candidate),'seconds':round(time.time()-t0,2)}
+              except subprocess.TimeoutExpired:
+                  return pid,name,None,{'status':'timeout','seconds':hard_timeout}
+              except Exception as e:
+                  return pid,name,None,{'status':'exception','error':str(e)}
+
+          best=dict(baseline)
+          origins={pid:'baseline-131052' for pid in baseline}
+          run_rows=[]
+          improved={}
+          start=time.time()
+          with concurrent.futures.ProcessPoolExecutor(max_workers=int(os.environ.get('WORKERS','2'))) as pool:
+              futures=[pool.submit(worker,j) for j in jobs]
+              for future in concurrent.futures.as_completed(futures):
+                  pid,name,candidate,meta=future.result()
+                  run_rows.append({'id':pid,'config':name,**meta})
+                  if candidate is not None and len(candidate)<len(best[pid]):
+                      best[pid]=candidate
+                      origins[pid]=f'GoodPJW elfopt.cpp {name}'
+                      improved[pid]=len(baseline[pid])-len(candidate)
+          Path('outputs/lns-runs.jsonl').write_text(''.join(json.dumps(x)+'\n' for x in sorted(run_rows,key=lambda r:(r['id'],r['config']))))
+          out=Path('outputs/submission.csv')
+          with out.open('w',newline='',encoding='utf-8') as f:
+              w=csv.writer(f,lineterminator='\n'); w.writerow(['id','program'])
+              for pid in baseline: w.writerow([pid,json.dumps(best[pid],separators=(',',':'))])
+          with open('outputs/origins.csv','w',newline='',encoding='utf-8') as f:
+              w=csv.writer(f,lineterminator='\n'); w.writerow(['id','source','instructions','saved'])
+              for pid in baseline: w.writerow([pid,origins[pid],len(best[pid]),len(baseline[pid])-len(best[pid])])
+          status_counts={}
+          for row in run_rows: status_counts[row['status']]=status_counts.get(row['status'],0)+1
+          report={
+              'baseline_total':sum(map(len,baseline.values())),
+              'new_total':sum(map(len,best.values())),
+              'saved_instructions':sum(map(len,baseline.values()))-sum(map(len,best.values())),
+              'improved_puzzles':len(improved),
+              'improvements':improved,
+              'runs':len(run_rows),
+              'status_counts':status_counts,
+              'wall_seconds':round(time.time()-start,2),
+              'candidate_sha256':hashlib.sha256(out.read_bytes()).hexdigest(),
+          }
+          Path('outputs/report.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          PY
+          python scripts/audit_baseline.py --puzzles data/puzzles.csv --submission outputs/submission.csv
+          sha256sum outputs/* > outputs/SHA256SUMS.txt
+
+      - name: Upload full-dataset LNS results
+        uses: actions/upload-artifact@v4
+        with:
+          name: santa-2026-elfopt-lns-full-dataset
+          path: outputs/
+          retention-days: 30
