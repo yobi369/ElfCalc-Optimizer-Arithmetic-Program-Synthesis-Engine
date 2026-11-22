@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - ".github/workflows/fetch-132477-inputs.yml"
+      - "README.md"
 
 permissions:
   actions: write
