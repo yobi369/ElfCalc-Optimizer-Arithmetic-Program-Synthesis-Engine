@@ -1,0 +1,75 @@
+name: Rebuild and verify 131052 portfolio
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/build-131052-portfolio.yml"
+      - "scripts/merge_attributed_frontiers.py"
+      - "src/elfcalc/**"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install project
+        run: python -m pip install -e .
+
+      - name: Retrieve pinned parent candidates and puzzle data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data outputs /tmp/santa-sources
+          base="https://www.kaggle.com/api/v1/datasets/download"
+          curl --fail --location --retry 3 "$base/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=297" -o /tmp/santa-sources/asterios-v297.zip
+          curl --fail --location --retry 3 "$base/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=18" -o /tmp/santa-sources/ishan-v18.zip
+          curl --fail --location --retry 3 "https://raw.githubusercontent.com/Juan-Severiano/santa-2026/main/checkpoints/132515.csv.gz" -o /tmp/santa-sources/juan-132515.csv.gz
+
+          echo "989370548e0a2046d1e70220c95c6bbd3767fd7133c8d7a441517b77ad00ef5e  /tmp/santa-sources/asterios-v297.zip" | sha256sum -c -
+          echo "2ae181390221a9b4e212ea2d43628059e0d6024ec2c0fae7748b36f2e0559831  /tmp/santa-sources/ishan-v18.zip" | sha256sum -c -
+          echo "851c86928bab87dff1c8569046de1cc8d1568618f4b8904cf59bc0d80689b323  /tmp/santa-sources/juan-132515.csv.gz" | sha256sum -c -
+
+          mkdir -p /tmp/santa-sources/asterios /tmp/santa-sources/ishan
+          unzip -q /tmp/santa-sources/asterios-v297.zip -d /tmp/santa-sources/asterios
+          unzip -q /tmp/santa-sources/ishan-v18.zip -d /tmp/santa-sources/ishan
+          gzip -dc /tmp/santa-sources/juan-132515.csv.gz > /tmp/santa-sources/juan-132515.csv
+
+          cp /tmp/santa-sources/asterios/puzzles.csv data/puzzles.csv
+          cp /tmp/santa-sources/ishan/submission.csv /tmp/santa-sources/ishan-submission.csv
+          echo "b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428  data/puzzles.csv" | sha256sum -c -
+          echo "d984166fee5681afc84382afda0d0eaf009922d88c192a9b8fa5dbc9dbbdc5d3  /tmp/santa-sources/juan-132515.csv" | sha256sum -c -
+          echo "e958798d65d1e36513f27f415d05488fb02c4d7eb6b89cb23ae3c56f84e80255  /tmp/santa-sources/ishan-submission.csv" | sha256sum -c -
+
+      - name: Merge per puzzle and replay every parent and result
+        run: |
+          python scripts/merge_attributed_frontiers.py \
+            --puzzles data/puzzles.csv \
+            --first /tmp/santa-sources/juan-132515.csv \
+            --second /tmp/santa-sources/ishan-submission.csv \
+            --first-name "Juan-Severiano checkpoint 132515" \
+            --second-name "Ishan Karnick frontier v18" \
+            --output outputs/submission.csv \
+            --origins outputs/origins.csv \
+            --report outputs/report.json
+          python scripts/audit_baseline.py --puzzles data/puzzles.csv --submission outputs/submission.csv
+          cp research/upstream/132515-NOTICE.md outputs/Juan-Severiano-NOTICE.md
+          cp research/upstream/ishan-v18-CREDITS.md outputs/Ishan-Karnick-CREDITS.md
+          cp licenses/Apache-2.0.txt outputs/Apache-2.0.txt
+          sha256sum outputs/* > outputs/SHA256SUMS.txt
+
+      - name: Upload verified submission artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: santa-2026-131052-verified-submission
+          path: outputs/
+          retention-days: 30
