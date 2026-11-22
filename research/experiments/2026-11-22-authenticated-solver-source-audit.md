@@ -40,3 +40,32 @@ Two restricted notebook pulls (Pratham Jain and Roman Rozen slugs) returned 403 
 - GoodPJW's notebook headline 130,984 is a reported notebook result, not yet an independently verified submission in this repository.
 - A notebook's Kaggle visibility does not automatically license reuse of its code or its input programs. Dataset and source licenses must be checked independently; mixed-source outputs need row-level attribution.
 - No Kaggle submission has been made by this project.
+
+
+## Follow-up verification — authenticated dataset pull (2026-11-22)
+
+The corrected authenticated workflow completed successfully on run 45056050119 (commit 713b8f2c6927f9a127035eace9c7b49c08e1a396). Artifact 14767845250 (2,271,039 bytes; SHA-256 d747e650682eeb769bdd9d78465a2e5e8210786d37427f615cfb16fe17412256) contains the GoodPJW attached dataset and selected notebooks. The GoodPJW source-aware notebook pulled in this run is titled **LB 130,981**.
+
+### Independent replay result
+
+- Candidate: `datasets/goodpjw/our_programs.csv`
+- Candidate SHA-256: `23da4454cd5cb8f2281669f1bf57904eae084352c9ae6a5cf5f423820583a09d`
+- Exact total: **130,981 instructions** (1,000 rows).
+- Pinned official `puzzles.csv` SHA-256: `b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428`.
+- Independent replay: **1,000/1,000 valid and complete**, zero invalid programs, zero missing targets; all machine constraints enforced (48 registers, exact division, positive results, value limit, 4,096-instruction and 131,072-byte limits).
+- Compared against the 131,047 full-dataset LNS candidate: 49 puzzles shorter, 1 longer, 50 changed; net **66 instructions saved**.
+- This pinned puzzle-file hash is identical to the one recorded in the earlier 131,052 baseline audit, so the candidate is measured on the same 1,000 official puzzles.
+
+The previously verified 131,007 frontier is 26 instructions above this 130,981 candidate. The 130,981 result therefore supersedes it as the best currently independently replayed score in this research run. It is still **not an official Kaggle submission**.
+
+### Provenance and remaining caution
+
+The candidate CSV is the dataset's `our_programs.csv`, not a newly authored solver output. The notebook metadata identifies `goodpjw2008/santa-2026-dag-lns-programs` as its attached dataset and lists multiple upstream kernel sources. The dataset archive includes mixed-source optimizer code and notices. Before publishing or redistributing this mixed-source CSV, complete row-level source attribution and license review. This restriction does not prevent local replay and score comparison.
+
+### Next work
+
+- Keep 130,981 as the research incumbent, preserving the earlier 131,007 artifact and provenance.
+- Continue the still-running full-dataset LNS search; validate any output against the same pinned puzzle SHA before promotion.
+- Inspect row-level provenance and licenses for the 130,981 frontier.
+- Study Atlas-style multi-bank cone synthesis and allocator-aware rescheduling on the hardest remaining puzzles.
+- Do not submit to Kaggle without the user's explicit submission instruction.
