@@ -10,6 +10,16 @@ The objective is to synthesize short arithmetic programs that produce every requ
 
 A full local run on the supplied scored dataset produced a 1,000-program candidate with **275,767 total instructions**. All 1,000 programs replayed successfully and covered every target; the longest program has 548 instructions. The official sample baseline has 1,490,379 instructions, so this candidate reduces the local instruction total by 1,214,612 (81.50%). On the 200 labeled practice puzzles, the same portfolio produced 55,946 instructions. These are locally measured candidate results, **not Kaggle leaderboard scores** and not claims of global optimality. The CSV candidate and its verification report are generated locally and are not committed with competition data.
 
+## Restore competition datasets
+
+Raw competition data is deliberately excluded from this public repository. Read [DATASETS.md](DATASETS.md) for the privacy rationale, current dataset fingerprints, and one-command retrieval instructions. After configuring Kaggle authentication, run:
+
+```bash
+bash scripts/fetch_kaggle_data.sh
+```
+
+The script restores the official puzzle and sample-submission files into the ignored local `data/` directory, so you do not need to attach those files to every coding session.
+
 ## Reproduce the baseline audit
 
 Place the official files in `data/` (the directory is git-ignored), then run:
