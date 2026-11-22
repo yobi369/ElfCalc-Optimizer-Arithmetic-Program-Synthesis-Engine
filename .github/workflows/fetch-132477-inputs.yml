@@ -1,0 +1,35 @@
+name: Fetch pinned 132477 portfolio inputs
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fetch-132477-inputs.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pinned public inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/archives
+          curl --fail --location --retry 3 \
+            "https://www.kaggle.com/api/v1/datasets/download/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=196" \
+            -o bundle/archives/asteriospanoras-196.zip
+          curl --fail --location --retry 3 \
+            "https://www.kaggle.com/kernels/scriptcontent/372207578/download" \
+            -o bundle/archives/asteriospanoras-372207578.ipynb
+          echo "71d54c19f6e8d8f0b0b855b5e7f9280946b46c8b3db83beebcf0ddcbed097cc5  bundle/archives/asteriospanoras-196.zip" | sha256sum -c -
+          echo "35b44d732044e006f359d05e6f7c262cea1cb000522ce2ebabbed2f15acb5d52  bundle/archives/asteriospanoras-372207578.ipynb" | sha256sum -c -
+      - name: Upload pinned inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinned-portfolio-inputs-asterios-196
+          path: bundle/archives/
+          retention-days: 30
