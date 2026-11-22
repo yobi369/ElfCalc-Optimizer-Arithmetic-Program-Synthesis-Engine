@@ -100,7 +100,7 @@ jobs:
           new_print = old_print + r'''
         if prog is None:
             with open(dumps + ".dags", "a") as dag_file:
-                dag_file.write(json.dumps({"id": pid, "chosen": {str(v): list(r) for v, r in chosen.items()}, "level": {str(v): int(l) for v, l in level.items()}}) + "\\n")
+                dag_file.write(json.dumps({"id": pid, "chosen": {str(v): list(r) for v, r in chosen.items()}, "level": {str(v): int(l) for v, l in level.items()}}) + "\n")
 '''
           assert old_print in s
           s = s.replace(old_print, new_print)
