@@ -94,3 +94,10 @@ Workflow run 45057171673 completed successfully after the workflow was extended 
 ### Current incumbent
 
 **130,976 instructions**, candidate SHA-256 `f06d968ae8cd3eaf5d06739bd999a4b1d6c87ddf9a7697686a7827f333b4ae46`. Keep the 130,981 candidate and its artifact for historical reproducibility. Do not submit without explicit user approval.
+
+
+## Latest promotion — 130,974 merged frontier
+
+The full-dataset GoodPJW LNS run 45051994422 completed successfully with a 131,045 output from its 131,052 baseline (7 instructions saved, 6 improved puzzles). Per-puzzle comparison against the v72 130,976 candidate found two strictly shorter LNS/baseline rows: `scored_0737` (110 vs 111) and `scored_0757` (128 vs 129). The resulting per-puzzle minimum merge scores **130,974**, independently replayed 1,000/1,000 with zero failures. Candidate SHA-256: `90f68edb0ebef9c7f2c1839dbc0935cabc13066c60f3de989e0320d49b5d2f36`. See `2026-11-22-goodpjw-130974-lns-merge.md`.
+
+The current research incumbent is now **130,974**. The 130,976 v72 candidate remains a reproducible parent checkpoint. Both are mixed-source public-reference portfolios; row-level lineage for the v72 base remains incomplete. Neither is an official Kaggle submission.
