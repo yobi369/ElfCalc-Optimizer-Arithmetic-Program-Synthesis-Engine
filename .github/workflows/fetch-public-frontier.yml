@@ -1,0 +1,35 @@
+name: Retrieve attributed public frontier checkpoint
+
+on:
+  push:
+    paths:
+      - ".github/workflows/fetch-public-frontier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  retrieve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve upstream checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p outputs/public-reference
+          curl --fail --location --retry 3 \
+            https://raw.githubusercontent.com/Juan-Severiano/santa-2026/main/checkpoints/132515.csv.gz \
+            -o outputs/public-reference/132515.csv.gz
+          echo "851c86928bab87dff1c8569046de1cc8d1568618f4b8904cf59bc0d80689b323  outputs/public-reference/132515.csv.gz" | sha256sum --check
+          gzip --decompress --stdout outputs/public-reference/132515.csv.gz > outputs/public-reference/132515.csv
+          echo "d984166fee5681afc84382afda0d0eaf009922d88c192a9b8fa5dbc9dbbdc5d3  outputs/public-reference/132515.csv" | sha256sum --check
+          cp THIRD_PARTY.md outputs/public-reference/THIRD_PARTY.md
+          cp licenses/Apache-2.0.txt outputs/public-reference/Apache-2.0.txt
+      - name: Upload verified checkpoint artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: attributed-frontier-132515
+          path: outputs/public-reference/
+          if-no-files-found: error
+          retention-days: 30
