@@ -104,7 +104,16 @@ jobs:
           n=int(os.environ.get('PUZZLE_COUNT','20'))
           chosen=[x[2] for x in ranked[:n]]
           with open('/tmp/goodpjw/work/targets.dump','w') as f:
-              for pid in chosen: f.write(f'D {pid} 0\n')
+              for pid in chosen:
+                  starts, _ = puzzles[pid]
+                  regs = list(starts) + [None] * (48-len(starts))
+                  op, a, b, d = programs[pid][0]
+                  x, y = regs[a], regs[b]
+                  if op == '+': value = x + y
+                  elif op == '-': value = x - y
+                  elif op == '*': value = x * y
+                  else: value = x // y
+                  f.write(f'D {pid} 1\\n{op} {x} {y} {value}\\n')
           with open('outputs/target-puzzles.txt','w') as f: f.write('\n'.join(chosen)+'\n')
           print('selected',len(chosen),'puzzles; top',ranked[:10])
           PY
