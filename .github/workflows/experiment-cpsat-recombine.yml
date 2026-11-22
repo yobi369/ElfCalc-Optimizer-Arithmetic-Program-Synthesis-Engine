@@ -1,0 +1,172 @@
+name: CP-SAT DAG recombination pilot
+
+on:
+  workflow_dispatch:
+    inputs:
+      puzzles:
+        description: Number of hardest puzzles to optimize
+        required: false
+        default: "20"
+      seconds:
+        description: CP-SAT seconds per puzzle
+        required: false
+        default: "8"
+  push:
+    paths:
+      - ".github/workflows/experiment-cpsat-recombine.yml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  recombine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install exact validator and CP-SAT
+        run: |
+          python -m pip install -e .
+          python -m pip install ortools
+
+      - name: Fetch pinned inputs and source-aware optimizer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/santa /tmp/goodpjw/src /tmp/goodpjw/data /tmp/goodpjw/work data outputs
+          base="https://www.kaggle.com/api/v1/datasets/download"
+          curl --fail --location --retry 3 "$base/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=297" -o /tmp/santa/asterios-v297.zip
+          curl --fail --location --retry 3 "$base/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=18" -o /tmp/santa/ishan-v18.zip
+          curl --fail --location --retry 3 "$base/goodpjw2008/santa-2026-dag-lns-programs?datasetVersionNumber=151" -o /tmp/santa/goodpjw-v151.zip
+          curl --fail --location --retry 3 "https://raw.githubusercontent.com/Juan-Severiano/santa-2026/main/checkpoints/132515.csv.gz" -o /tmp/santa/juan-132515.csv.gz
+
+          echo "989370548e0a2046d1e70220c95c6bbd3767fd7133c8d7a441517b77ad00ef5e  /tmp/santa/asterios-v297.zip" | sha256sum -c -
+          echo "2ae181390221a9b4e212ea2d43628059e0d6024ec2c0fae7748b36f2e0559831  /tmp/santa/ishan-v18.zip" | sha256sum -c -
+          echo "581586ddc71414c3370ddc238fed1a24c94581d845d961ca178aaf0551842fa8  /tmp/santa/goodpjw-v151.zip" | sha256sum -c -
+          echo "851c86928bab87dff1c8569046de1cc8d1568618f4b8904cf59bc0d80689b323  /tmp/santa/juan-132515.csv.gz" | sha256sum -c -
+
+          unzip -q /tmp/santa/asterios-v297.zip -d /tmp/santa/asterios
+          unzip -q /tmp/santa/ishan-v18.zip -d /tmp/santa/ishan
+          unzip -q /tmp/santa/goodpjw-v151.zip -d /tmp/santa/goodpjw
+          gzip -dc /tmp/santa/juan-132515.csv.gz > /tmp/santa/juan-132515.csv
+          cp /tmp/santa/asterios/puzzles.csv data/puzzles.csv
+          echo "b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428  data/puzzles.csv" | sha256sum -c -
+
+          # Build the frozen 131052 baseline from its two attributed parents.
+          python scripts/merge_attributed_frontiers.py \
+            --puzzles data/puzzles.csv \
+            --first /tmp/santa/juan-132515.csv \
+            --second /tmp/santa/ishan/submission.csv \
+            --first-name "Juan-Severiano checkpoint 132515" \
+            --second-name "Ishan Karnick frontier v18" \
+            --output outputs/baseline-131052.csv \
+            --origins outputs/baseline-origins.csv \
+            --report outputs/baseline-report.json
+
+          # Convert Asterios' id,instructions,source,program file to the official two-column schema.
+          python - <<'PY'
+          import csv
+          with open('/tmp/santa/asterios/best_programs.csv', newline='', encoding='utf-8-sig') as src, open('/tmp/santa/asterios-submission.csv','w',newline='',encoding='utf-8') as dst:
+              reader=csv.DictReader(src); writer=csv.writer(dst,lineterminator='\n'); writer.writerow(['id','program'])
+              for row in reader: writer.writerow([row['id'],row['program']])
+          PY
+
+          # Place the GoodPJW Apache-2.0 research implementation in its expected layout.
+          cp /tmp/santa/goodpjw/elf.py /tmp/goodpjw/src/elf.py
+          cp /tmp/santa/goodpjw/recombine.py /tmp/goodpjw/src/recombine.py
+          cp data/puzzles.csv /tmp/goodpjw/data/puzzles.csv
+          cp outputs/baseline-131052.csv /tmp/goodpjw/work/baseline.csv
+
+      - name: Select hardest puzzles and create recipe-dump selectors
+        env:
+          PUZZLE_COUNT: ${{ github.event.inputs.puzzles || '20' }}
+        run: |
+          python - <<'PY'
+          import csv, json, os
+          puzzles={}
+          with open('data/puzzles.csv',newline='',encoding='utf-8-sig') as f:
+              for r in csv.DictReader(f):
+                  puzzles[r['id']] = (json.loads(r['starting_values']), set(json.loads(r['targets'])))
+          programs={}
+          with open('outputs/baseline-131052.csv',newline='',encoding='utf-8') as f:
+              for r in csv.DictReader(f): programs[r['id']] = json.loads(r['program'])
+          ranked=[]
+          for pid,(starts,targets) in puzzles.items():
+              floor=len(targets-set(starts))
+              ranked.append((len(programs[pid])-floor,len(programs[pid]),pid))
+          ranked.sort(reverse=True)
+          n=int(os.environ.get('PUZZLE_COUNT','20'))
+          chosen=[x[2] for x in ranked[:n]]
+          with open('/tmp/goodpjw/work/targets.dump','w') as f:
+              for pid in chosen: f.write(f'D {pid} 0\n')
+          with open('outputs/target-puzzles.txt','w') as f: f.write('\n'.join(chosen)+'\n')
+          print('selected',len(chosen),'puzzles; top',ranked[:10])
+          PY
+
+      - name: Run graph-DAG recombination without fixed order
+        env:
+          SECONDS: ${{ github.event.inputs.seconds || '8' }}
+        working-directory: /tmp/goodpjw
+        run: |
+          python src/recombine.py work/baseline.csv work/targets.dump "$SECONDS" \
+            /tmp/santa/ishan/submission.csv /tmp/santa/asterios-submission.csv /tmp/santa/juan-132515.csv \
+            | tee /tmp/santa/recombine-open.log
+
+      - name: Run graph-DAG recombination with baseline order constraints
+        env:
+          SECONDS: ${{ github.event.inputs.seconds || '8' }}
+        working-directory: /tmp/goodpjw
+        run: |
+          FIXORDER=1 python src/recombine.py work/baseline.csv work/targets.dump "$SECONDS" \
+            /tmp/santa/ishan/submission.csv /tmp/santa/asterios-submission.csv /tmp/santa/juan-132515.csv \
+            | tee /tmp/santa/recombine-fixed.log
+
+      - name: Apply strict improvements and independently audit
+        run: |
+          python - <<'PY'
+          import csv, json, hashlib
+          from pathlib import Path
+          base={}
+          with open('outputs/baseline-131052.csv',newline='',encoding='utf-8') as f:
+              for r in csv.DictReader(f): base[r['id']]=json.loads(r['program'])
+          chosen=dict(base); source={k:'baseline-131052' for k in base}
+          results=[]
+          for path in ['/tmp/goodpjw/work/targets.dump.results','/tmp/goodpjw/work/targets.dump.results']:
+              p=Path(path)
+              if not p.exists(): continue
+              for line in p.read_text().splitlines():
+                  try: row=json.loads(line)
+                  except Exception: continue
+                  pid=row['id']; prog=row['program']
+                  if pid in chosen and len(prog)<len(chosen[pid]):
+                      chosen[pid]=prog; source[pid]='goodpjw-cpsat-recombine'; results.append((pid,len(base[pid]),len(prog)))
+          out=Path('outputs/submission.csv')
+          with out.open('w',newline='',encoding='utf-8') as f:
+              w=csv.writer(f,lineterminator='\n'); w.writerow(['id','program'])
+              for pid in base: w.writerow([pid,json.dumps(chosen[pid],separators=(',',':'))])
+          with open('outputs/origins.csv','w',newline='',encoding='utf-8') as f:
+              w=csv.writer(f,lineterminator='\n'); w.writerow(['id','source','instructions'])
+              for pid in base: w.writerow([pid,source[pid],len(chosen[pid])])
+          total=sum(map(len,chosen.values()))
+          report={'baseline_total':sum(map(len,base.values())),'new_total':total,'strictly_improved_puzzles':results,'savings':sum(map(len,base.values()))-total,'candidate_sha256':hashlib.sha256(out.read_bytes()).hexdigest()}
+          Path('outputs/report.json').write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
+          PY
+          python scripts/audit_baseline.py --puzzles data/puzzles.csv --submission outputs/submission.csv
+          cp /tmp/santa/recombine-open.log outputs/recombine-open.log
+          cp /tmp/santa/recombine-fixed.log outputs/recombine-fixed.log
+          cp /tmp/santa/goodpjw/NOTICE.md outputs/GoodPJW-NOTICE.md 2>/dev/null || true
+          sha256sum outputs/* > outputs/SHA256SUMS.txt
+
+      - name: Upload CP-SAT experiment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: santa-2026-cpsat-recombine-pilot
+          path: outputs/
+          retention-days: 30
