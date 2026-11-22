@@ -15,7 +15,7 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     steps:
-      - name: Download pinned and current public datasets
+      - name: Download current public datasets and metadata
         shell: bash
         run: |
           set -euo pipefail
@@ -26,26 +26,45 @@ jobs:
             echo "Fetching $name"
             curl --fail --location --retry 3 "$url" -o "bundle/$name.zip"
             sha256sum "bundle/$name.zip"
-            unzip -l "bundle/$name.zip" | head -35 || true
+            unzip -l "bundle/$name.zip" | head -25 || true
           }
+          metadata() {
+            local name="$1"
+            local slug="$2"
+            curl --fail --location --retry 3 "https://www.kaggle.com/api/v1/datasets/view/$slug" -o "bundle/$name-metadata.json"
+          }
+
+          # Pinned prior versions retained for reproducibility.
           fetch asterios-v237 "https://www.kaggle.com/api/v1/datasets/download/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=237"
-          fetch ishankarnick-frontier-v4 "https://www.kaggle.com/api/v1/datasets/download/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=4"
-          fetch pardheev-latest "https://www.kaggle.com/api/v1/datasets/download/pardheev/santa-2026-elf-calculator-132997"
-          fetch kmmmvs-improver-v3 "https://www.kaggle.com/api/v1/datasets/download/kmmmvs/santa-2026-improver-programs?datasetVersionNumber=3"
-          fetch nevska-explorer-v7 "https://www.kaggle.com/api/v1/datasets/download/nevska/santa-2026-explorer-files?datasetVersionNumber=7"
-          for slug in \
-            asteriospanoras/santa-2026-elf-programs-and-experiments \
-            ishankarnick/santa-2026-frontier-programs \
-            pardheev/santa-2026-elf-calculator-132997 \
-            kmmmvs/santa-2026-improver-programs \
-            nevska/santa-2026-explorer-files; do
-            safe="${slug//\//-}"
-            curl --fail --location --retry 2 "https://www.kaggle.com/api/v1/datasets/view/$slug" -o "bundle/$safe-metadata.json" || true
-          done
+          fetch ishan-v4 "https://www.kaggle.com/api/v1/datasets/download/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=4"
+
+          # Current versions at retrieval time; metadata records their version numbers and licenses.
+          fetch asterios-current "https://www.kaggle.com/api/v1/datasets/download/asteriospanoras/santa-2026-elf-programs-and-experiments"
+          fetch ishan-current "https://www.kaggle.com/api/v1/datasets/download/ishankarnick/santa-2026-frontier-programs"
+          fetch alexchilton-current "https://www.kaggle.com/api/v1/datasets/download/alexchilton/santa-2026-rudolph-programs"
+          fetch hanif-current "https://www.kaggle.com/api/v1/datasets/download/hanifnoerrofiq/santa-2026-elf-calculator-peephole-programs"
+          fetch goodpjw-current "https://www.kaggle.com/api/v1/datasets/download/goodpjw2008/santa-2026-dag-lns-programs"
+          fetch konbu-current "https://www.kaggle.com/api/v1/datasets/download/konbu17/santa-2026-elf-calculator-programs"
+          fetch ozertuu-current "https://www.kaggle.com/api/v1/datasets/download/ozertuu/santa-2026-verified-programs"
+          fetch sacuscreed-current "https://www.kaggle.com/api/v1/datasets/download/sacuscreed/santa-2026"
+          fetch thisray-current "https://www.kaggle.com/api/v1/datasets/download/thisray/santa-2026-two-step-dictionary-submission"
+          fetch kindasomethin-current "https://www.kaggle.com/api/v1/datasets/download/kindasomethin/santa-2026-exact-portfolio-checkpoints"
+          fetch improver-v3 "https://www.kaggle.com/api/v1/datasets/download/kmmmvs/santa-2026-improver-programs?datasetVersionNumber=3"
+
+          metadata asterios "asteriospanoras/santa-2026-elf-programs-and-experiments"
+          metadata ishan "ishankarnick/santa-2026-frontier-programs"
+          metadata alexchilton "alexchilton/santa-2026-rudolph-programs"
+          metadata hanif "hanifnoerrofiq/santa-2026-elf-calculator-peephole-programs"
+          metadata goodpjw "goodpjw2008/santa-2026-dag-lns-programs"
+          metadata konbu "konbu17/santa-2026-elf-calculator-programs"
+          metadata ozertuu "ozertuu/santa-2026-verified-programs"
+          metadata sacuscreed "sacuscreed/santa-2026"
+          metadata thisray "thisray/santa-2026-two-step-dictionary-submission"
+          metadata kindasomethin "kindasomethin/santa-2026-exact-portfolio-checkpoints"
           sha256sum bundle/* > bundle/SHA256SUMS.txt
-      - name: Upload public research pool bundle
+      - name: Upload research pool bundle
         uses: actions/upload-artifact@v4
         with:
-          name: santa-public-research-pools-2026-11-22
+          name: santa-public-research-pools-latest-2026-11-22
           path: bundle/
           retention-days: 30
