@@ -86,6 +86,13 @@ jobs:
               echo "SKIPPED_OR_RESTRICTED $slug" | tee -a bundle/pull-status.txt
             fi
           done
+          mkdir -p bundle/datasets/goodpjw
+          echo "Fetching GoodPJW's current program dataset"
+          if kaggle datasets download -d goodpjw/santa-2026-dag-lns-programs -p bundle/datasets/goodpjw --unzip; then
+            echo "SUCCESS dataset goodpjw2008/santa-2026-dag-lns-programs" | tee -a bundle/pull-status.txt
+          else
+            echo "SKIPPED_OR_RESTRICTED dataset goodpjw2008/santa-2026-dag-lns-programs" | tee -a bundle/pull-status.txt
+          fi
           find bundle -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > bundle/SHA256SUMS.txt
 
       - name: Upload authenticated notebook source bundle
