@@ -124,6 +124,7 @@ jobs:
           SECONDS: ${{ github.event.inputs.seconds || '8' }}
         working-directory: /tmp/goodpjw
         run: |
+          set -euo pipefail
           python src/recombine.py work/baseline.csv work/targets.dump "$SECONDS" \
             /tmp/santa/ishan/submission.csv /tmp/santa/asterios-submission.csv /tmp/santa/juan-132515.csv \
             | tee /tmp/santa/recombine-open.log
@@ -133,6 +134,7 @@ jobs:
           SECONDS: ${{ github.event.inputs.seconds || '8' }}
         working-directory: /tmp/goodpjw
         run: |
+          set -euo pipefail
           FIXORDER=1 python src/recombine.py work/baseline.csv work/targets.dump "$SECONDS" \
             /tmp/santa/ishan/submission.csv /tmp/santa/asterios-submission.csv /tmp/santa/juan-132515.csv \
             | tee /tmp/santa/recombine-fixed.log
