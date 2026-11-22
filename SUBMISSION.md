@@ -1,33 +1,33 @@
-# Submission checkpoint — 131,052 instructions
+# Submission checkpoint — 131,047 instructions
 
 ## Current candidate
 
 - File in the verified artifact: `submission.csv`
 - Rows: 1,000
 - Exact schema: `id,program`
-- Total instruction count: **131,052**
+- Total instruction count: **131,047**
 - Local exact replay: **1,000/1,000 valid and complete**
-- Candidate SHA-256: `1902b48b488380c9282a2537ad0279cc7f6c0d159f19360b019501fe0401ccef`
+- Candidate SHA-256: `fada061b2aba1ba8dfbd0ed27083ec080f99238295c5fd08c5d2ee9703c4597a`
 - Puzzle data SHA-256: `b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428`
 
-This is a per-puzzle minimum merge of two attributed public references, not an original solver result:
+This is an attributed public-reference portfolio, not an original solver result. It is based on the per-puzzle minimum merge of two attributed public references, then five puzzle programs were shortened by GoodPJW's Apache-2.0 LNS optimizer:
 
 - 640 rows from Juan-Severiano's Apache-2.0 checkpoint (132,515 total).
 - 360 rows from Ishan Karnick's frontier dataset v18 (131,053 total), with per-row source credits retained.
 
-The merge saves 1,463 instructions versus the Juan-Severiano parent and one instruction versus the Ishan parent. Preserve [the Juan-Severiano notice](research/upstream/132515-NOTICE.md), [Ishan v18 credits](research/upstream/ishan-v18-CREDITS.md), [Ishan v18 manifest](research/upstream/ishan-v18-MANIFEST.md), and [the portfolio report](research/portfolio-131052.md).
+The parent merge saves 1,463 instructions versus the Juan-Severiano checkpoint and one instruction versus the Ishan v18 frontier. The LNS pass then saves five additional instructions on five distinct puzzles. Preserve [the Juan-Severiano notice](research/upstream/132515-NOTICE.md), [Ishan v18 credits](research/upstream/ishan-v18-CREDITS.md), [Ishan v18 manifest](research/upstream/ishan-v18-MANIFEST.md), [the parent portfolio report](research/portfolio-131052.md), and [the full-dataset LNS experiment report](research/experiments/2026-11-22-goodpjw-elfopt-lns-full-dataset.md).
 
 ## Rebuild the exact candidate
 
 The submission CSV is not committed to the public repository. It can be regenerated from pinned public inputs:
 
 1. Open GitHub Actions.
-2. Run **Rebuild and verify 131052 portfolio** (or use its latest successful run).
+2. Run **Rebuild and verify 131052 portfolio (parent), then run the full-dataset LNS workflow** (or use its latest successful run).
 3. Download the artifact `santa-2026-131052-verified-submission`.
 4. Extract `submission.csv`.
 5. Verify its SHA-256 against the value above.
 
-The workflow verifies the compressed parent archives, puzzle data hash, and parent candidate hashes; replays both parents and the merged output; then runs the repository's independent full-submission audit. The latest successful artifact is also stored in the owner's private ChatGPT Library under `Kaggle Competitions/Santa 2026 - Elf Calculator`.
+The parent workflow verifies the compressed parent archives, puzzle data hash, and parent candidate hashes; replays both parents and the merged output. The LNS workflow independently replays each accepted improvement and the final serialized candidate. The verified 131047 artifact from run 45048175847 is retained in the owner's private ChatGPT Library. The latest successful artifact is also stored in the owner's private ChatGPT Library under `Kaggle Competitions/Santa 2026 - Elf Calculator`.
 
 ## Submit through the Kaggle CLI
 
