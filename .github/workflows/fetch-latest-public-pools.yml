@@ -36,7 +36,9 @@ jobs:
 
           # Pinned prior versions retained for reproducibility.
           fetch asterios-v237 "https://www.kaggle.com/api/v1/datasets/download/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=237"
+          fetch asterios-v297 "https://www.kaggle.com/api/v1/datasets/download/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=297"
           fetch ishan-v4 "https://www.kaggle.com/api/v1/datasets/download/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=4"
+          fetch ishan-v18 "https://www.kaggle.com/api/v1/datasets/download/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=18"
 
           # Current versions at retrieval time; metadata records their version numbers and licenses.
           fetch asterios-current "https://www.kaggle.com/api/v1/datasets/download/asteriospanoras/santa-2026-elf-programs-and-experiments"
