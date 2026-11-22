@@ -156,3 +156,6 @@ The email invitation lists **21 January 2027** as the entry deadline. The compet
 
 To be selected after reviewing the competition rules and any third-party solver code used. The current constructor is independently implemented; no third-party implementation is vendored.
 
+
+
+<!-- trigger latest public pool retrieval -->
