@@ -2,6 +2,9 @@ name: Fetch authenticated Kaggle solver notebook sources
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fetch-authenticated-kernel-sources.yml"
 
 permissions:
   contents: read
@@ -93,6 +96,40 @@ jobs:
           else
             echo "SKIPPED_OR_RESTRICTED dataset goodpjw2008/santa-2026-dag-lns-programs" | tee -a bundle/pull-status.txt
           fi
+          find bundle -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > bundle/SHA256SUMS.txt
+
+
+      - name: Pull additional public candidate outputs
+        if: steps.check-token.outputs.has_token == 'true'
+        env:
+          KAGGLE_API_TOKEN: ${{ secrets.KAGGLE_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundle/candidate-outputs
+          slugs=(
+            "ozertuu/santa-2026-starter-notebook"
+            "pardheev/130-982-best-public-score-santa-2026"
+            "arsen123/santa-2026-reproducible-dictionary-beam-solver"
+            "muhakabartay/santa-2026-strict-verifier-public-merge-anatomy"
+            "asteriospanoras/santa-2026-best-public-score-a-gift-per-run"
+            "alexchilton/rudolph-the-red-nosed-register-allocator"
+            "ishankarnick/santa-2026-frontier-programs-130-994"
+            "vigneshsankar1962/santa-2026-free-order-cp-sat-dag-optimizer"
+            "vigneshsankar1962/santa-2026-132k-sota-frontier-synthesis-portfolio"
+            "pablodiegoo/santa-2026-deterministic-atlas-solver"
+          )
+          : > bundle/candidate-outputs-status.txt
+          for slug in "${slugs[@]}"; do
+            name="${slug//\\//-}"
+            mkdir -p "bundle/candidate-outputs/$name"
+            echo "Fetching output for $slug"
+            if kaggle kernels output "$slug" -p "bundle/candidate-outputs/$name"; then
+              echo "SUCCESS $slug" | tee -a bundle/candidate-outputs-status.txt
+            else
+              echo "NO_OUTPUT_OR_RESTRICTED $slug" | tee -a bundle/candidate-outputs-status.txt
+            fi
+          done
           find bundle -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > bundle/SHA256SUMS.txt
 
       - name: Upload authenticated notebook source bundle
