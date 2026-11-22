@@ -33,7 +33,7 @@ jobs:
           for slug in "${slugs[@]}"; do
             name="${slug//\//-}"
             echo "Fetching $slug"
-            curl --location --retry 2 --silent --show-error "https://www.kaggle.com/api/v1/kernels/view/$slug" -o "bundle/$name-metadata.json" || true
+            curl --fail --location --retry 2 --silent --show-error "https://www.kaggle.com/api/v1/kernels/view/$slug" -o "bundle/$name-metadata.json" || true
             curl --location --retry 2 --silent --show-error "https://www.kaggle.com/api/v1/kernels/scriptdownload/$slug" -o "bundle/$name-source.zip" || true
             if [ -f "bundle/$name-source.zip" ]; then
               echo "source $(stat -c%s "bundle/$name-source.zip") bytes"
