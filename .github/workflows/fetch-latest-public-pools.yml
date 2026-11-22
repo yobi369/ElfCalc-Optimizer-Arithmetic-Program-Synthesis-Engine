@@ -1,0 +1,51 @@
+name: Fetch latest public Santa research pools
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fetch-latest-public-pools.yml"
+      - "README.md"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download pinned and current public datasets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bundle
+          fetch() {
+            local name="$1"
+            local url="$2"
+            echo "Fetching $name"
+            curl --fail --location --retry 3 "$url" -o "bundle/$name.zip"
+            sha256sum "bundle/$name.zip"
+            unzip -l "bundle/$name.zip" | head -35 || true
+          }
+          fetch asterios-v237 "https://www.kaggle.com/api/v1/datasets/download/asteriospanoras/santa-2026-elf-programs-and-experiments?datasetVersionNumber=237"
+          fetch ishankarnick-frontier-v4 "https://www.kaggle.com/api/v1/datasets/download/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=4"
+          fetch pardheev-latest "https://www.kaggle.com/api/v1/datasets/download/pardheev/santa-2026-elf-calculator-132997"
+          fetch kmmmvs-improver-v3 "https://www.kaggle.com/api/v1/datasets/download/kmmmvs/santa-2026-improver-programs?datasetVersionNumber=3"
+          fetch nevska-explorer-v7 "https://www.kaggle.com/api/v1/datasets/download/nevska/santa-2026-explorer-files?datasetVersionNumber=7"
+          for slug in \
+            asteriospanoras/santa-2026-elf-programs-and-experiments \
+            ishankarnick/santa-2026-frontier-programs \
+            pardheev/santa-2026-elf-calculator-132997 \
+            kmmmvs/santa-2026-improver-programs \
+            nevska/santa-2026-explorer-files; do
+            safe="${slug//\//-}"
+            curl --fail --location --retry 2 "https://www.kaggle.com/api/v1/datasets/view/$slug" -o "bundle/$safe-metadata.json" || true
+          done
+          sha256sum bundle/* > bundle/SHA256SUMS.txt
+      - name: Upload public research pool bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: santa-public-research-pools-2026-11-22
+          path: bundle/
+          retention-days: 30
