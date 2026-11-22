@@ -39,3 +39,8 @@ The merged candidate is still mixed-source: 998 rows from GoodPJW's source-aware
 ## Next search
 
 A separate higher-budget local LNS pass was already running from the v71 130,981 base when v72 was discovered. Its output will be merged against 130,974 and independently replayed. Targeted Atakan multiplier-frontier and interface-closure experiments are also planned for the highest-cost low-seed puzzles.
+
+
+## Cross-check with the earlier Atakan full-dataset bank
+
+Atakan full-dataset run 45052245963 produced 131,051 from a 131,052 parent (one instruction saved, one puzzle improved). Its output was independently compared with the 130,974 candidate. It was longer on 54 puzzles, equal on 946, and shorter on none. Therefore it does not change the 130,974 incumbent. The separate targeted Atakan search on the 200 highest-cost puzzles is still running.
