@@ -1,3 +1,4 @@
+# Reproducible full-dataset run; data file comes from the pinned Asterios bundle.
 name: Full-dataset Atakan frontier and interface-closure search
 
 on:
