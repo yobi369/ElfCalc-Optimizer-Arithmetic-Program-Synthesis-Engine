@@ -13,6 +13,8 @@ jobs:
   retrieve:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
       - name: Retrieve upstream checkpoint
         shell: bash
         run: |
