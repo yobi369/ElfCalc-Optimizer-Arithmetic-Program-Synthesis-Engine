@@ -31,6 +31,8 @@ A public Apache-2.0 reference checkpoint is available at **132,515 total instruc
 
 **Attribution:** this is an inherited public-reference merge, not a score independently achieved by this repository. Preserve all upstream credits. Our earlier independent constructive candidate scored 275,767; it remains a useful reproducible baseline for research, but it is not the strongest available candidate. Do not claim 132,515 as an original algorithmic result.
 
+Submission and restoration steps are documented in [SUBMISSION.md](SUBMISSION.md).
+
 The workflow [fetch-public-frontier.yml](.github/workflows/fetch-public-frontier.yml) retrieves the pinned upstream checkpoint, verifies its compressed and uncompressed hashes, and publishes a temporary GitHub Actions artifact. The raw Kaggle competition CSVs remain excluded from this public repository.
 
 The current public standings snapshot checked on 22 November listed leading scores near 126,659. The 132,515 checkpoint is therefore a strong validated starting point, not a claim of first place. Future improvements must be measured per puzzle against this frozen baseline and independently replayed before replacing it.
