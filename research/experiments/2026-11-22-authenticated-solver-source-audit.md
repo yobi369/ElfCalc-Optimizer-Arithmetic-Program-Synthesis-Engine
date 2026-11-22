@@ -69,3 +69,28 @@ The candidate CSV is the dataset's `our_programs.csv`, not a newly authored solv
 - Inspect row-level provenance and licenses for the 130,981 frontier.
 - Study Atlas-style multi-bank cone synthesis and allocator-aware rescheduling on the hardest remaining puzzles.
 - Do not submit to Kaggle without the user's explicit submission instruction.
+
+
+## Follow-up verification — v72 source-embedded frontier patch (2026-11-22)
+
+The next authenticated source bundle exposed GoodPJW's newer notebook:
+`goodpjw2008/santa-2026-source-aware-frontier-lb-130-976` (v72). Its attached dataset still contains the v71 130,981 `our_programs.csv`; v72 stores the delta as a compressed JSON patch in the notebook source. I extracted only the base64/zlib data payload (did not execute the notebook), applied the `ours` map to the pinned v71 `our_programs.csv`, then independently replayed the resulting CSV.
+
+- Source notebook SHA-256: `b009a61bd1672c139935ae747c8bd9b6af0b70f206242f7cca16581c5aed8c62`.
+- Compressed patch SHA-256: `c331a1496d23ffefcc9105955dc00a3fbb3905374b6a9271fafb097913e83803`.
+- Base v71 `our_programs.csv` SHA-256: `23da4454cd5cb8f2281669f1bf57904eae084352c9ae6a5cf5f423820583a09d`.
+- Reconstructed candidate SHA-256: `f06d968ae8cd3eaf5d06739bd999a4b1d6c87ddf9a7697686a7827f333b4ae46`.
+- Total: **130,976** instructions.
+- Independent replay: **1,000/1,000 valid and complete**, zero failures, against official puzzles SHA-256 `b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428`.
+- Compared with v71 130,981: 84 program rows changed, 4 shorter, 0 longer, 80 same length; net reduction **5**.
+- The reconstructed 130,976 candidate also beats the independently replayed public output files retrieved from Ozertuu (130,979), Alex Chilton (130,979), Ishan Karnick (130,994), Vignesh (131,007), and Pablo Diego (131,946). No row in those outputs improves on v72's candidate.
+
+This supersedes 130,981 as the research incumbent. It remains a source-derived public candidate, not an official Kaggle submission. Its source-aware lineage remains mixed; preserve provenance and license review before redistribution.
+
+### Additional authenticated source-output retrieval
+
+Workflow run 45057171673 completed successfully after the workflow was extended to retrieve output files from leading public kernels. Artifact 14768460045 contains 10 candidate output pulls; successful pulls are listed in `candidate-outputs-status.txt`. All six complete submission files available in the bundle were exact-replayed. The 130,979 Ozertuu and Alex files are the strongest standalone outputs in that pull, but neither beats the reconstructed 130,976 v72 frontier.
+
+### Current incumbent
+
+**130,976 instructions**, candidate SHA-256 `f06d968ae8cd3eaf5d06739bd999a4b1d6c87ddf9a7697686a7827f333b4ae46`. Keep the 130,981 candidate and its artifact for historical reproducibility. Do not submit without explicit user approval.
