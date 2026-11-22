@@ -76,7 +76,9 @@ jobs:
             "romanrozen/santa-2026-elf-calculator"
             "mizeroluckygall/elf-calculator-best-of-public-merge-polish"
             "alexchilton/rudolph-the-red-nosed-register-allocator"
+            "avazaku/elf-calc-shared-helpers-chain-resynthesis"
             "ozertuu/santa-2026-starter-notebook"
+            "avazaku/elf-calc-shared-helpers-chain-resynthesis"
           )
           : > bundle/pull-status.txt
           for slug in "${slugs[@]}"; do
