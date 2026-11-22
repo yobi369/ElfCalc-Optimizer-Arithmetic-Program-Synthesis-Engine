@@ -1,0 +1,245 @@
+name: Full-dataset Atakan frontier and interface-closure search
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  atakan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install exact project validator
+        run: python -m pip install -e .
+
+      - name: Fetch pinned baseline and Apache-2.0 optimizer sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/santa/juan /tmp/santa/ishan /tmp/santa/goodpjw data outputs
+          base="https://www.kaggle.com/api/v1/datasets/download"
+          curl --fail --location --retry 3 "$base/ishankarnick/santa-2026-frontier-programs?datasetVersionNumber=18" -o /tmp/santa/ishan-v18.zip
+          curl --fail --location --retry 3 "$base/goodpjw2008/santa-2026-dag-lns-programs?datasetVersionNumber=151" -o /tmp/santa/goodpjw-v151.zip
+          curl --fail --location --retry 3 "https://raw.githubusercontent.com/Juan-Severiano/santa-2026/main/checkpoints/132515.csv.gz" -o /tmp/santa/juan-132515.csv.gz
+
+          echo "2ae181390221a9b4e212ea2d43628059e0d6024ec2c0fae7748b36f2e0559831  /tmp/santa/ishan-v18.zip" | sha256sum -c -
+          echo "581586ddc71414c3370ddc238fed1a24c94581d845d961ca178aaf0551842fa8  /tmp/santa/goodpjw-v151.zip" | sha256sum -c -
+          echo "851c86928bab87dff1c8569046de1cc8d1568618f4b8904cf59bc0d80689b323  /tmp/santa/juan-132515.csv.gz" | sha256sum -c -
+
+          unzip -q /tmp/santa/ishan-v18.zip -d /tmp/santa/ishan
+          unzip -q /tmp/santa/goodpjw-v151.zip -d /tmp/santa/goodpjw
+          gzip -dc /tmp/santa/juan-132515.csv.gz > /tmp/santa/juan-132515.csv
+          cp /tmp/santa/ishan/puzzles.csv data/puzzles.csv
+          echo "b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428  data/puzzles.csv" | sha256sum -c -
+
+          python scripts/merge_attributed_frontiers.py \
+            --puzzles data/puzzles.csv \
+            --first /tmp/santa/juan-132515.csv \
+            --second /tmp/santa/ishan/submission.csv \
+            --first-name "Juan-Severiano checkpoint 132515" \
+            --second-name "Ishan Karnick frontier v18" \
+            --output outputs/baseline-131052.csv \
+            --origins outputs/baseline-origins.csv \
+            --report outputs/baseline-report.json
+
+          cd /tmp/santa/goodpjw/atakan_optimizers
+          g++ -O3 -std=c++17 -march=native elf_multiplier_frontier.cpp -o /tmp/santa/frontier
+          g++ -O3 -std=c++17 -march=native elf_interface_closure.cpp -o /tmp/santa/closure
+          sha256sum /tmp/santa/frontier /tmp/santa/closure | tee "$GITHUB_WORKSPACE/outputs/atakan-binaries.sha256"
+          cp NOTICE.md "$GITHUB_WORKSPACE/outputs/Atakan-NOTICE.md"
+          cp /tmp/santa/goodpjw/atakan_optimizers/NOTICE.md "$GITHUB_WORKSPACE/outputs/Atakan-NOTICE.md"
+          cp "$GITHUB_WORKSPACE/licenses/Apache-2.0.txt" "$GITHUB_WORKSPACE/outputs/Apache-2.0.txt"
+
+      - name: Run register-aware frontier and closure searches on all puzzles
+        run: |
+          python - <<'PY'
+          import csv, json, hashlib, subprocess, concurrent.futures, time
+          from pathlib import Path
+          from collections import Counter
+
+          def read_csv(path):
+              with open(path, newline="", encoding="utf-8-sig") as f:
+                  return list(csv.DictReader(f))
+
+          puzzles = {}
+          for row in read_csv("data/puzzles.csv"):
+              puzzles[row["id"]] = {
+                  "seeds": json.loads(row["starting_values"]),
+                  "targets": sorted(set(json.loads(row["targets"]))),
+                  "limit": int(row["value_limit"]),
+                  "registers": int(row["registers"]),
+              }
+
+          programs = {}
+          for row in read_csv("outputs/baseline-131052.csv"):
+              programs[row["id"]] = json.loads(row["program"])
+          baseline_origins = {
+              row["id"]: row["selected_source"]
+              for row in read_csv("outputs/baseline-origins.csv")
+          }
+
+          def validate(p, program):
+              regs = [None] * p["registers"]
+              regs[:len(p["seeds"])] = p["seeds"]
+              seen = set(p["seeds"])
+              for instruction in program:
+                  if len(instruction) != 4:
+                      return False
+                  op, a, b, d = instruction
+                  if not all(isinstance(x, int) for x in (a, b, d)):
+                      return False
+                  if not (0 <= a < len(regs) and 0 <= b < len(regs) and 0 <= d < len(regs)):
+                      return False
+                  x, y = regs[a], regs[b]
+                  if x is None or y is None:
+                      return False
+                  if op == "+": z = x + y
+                  elif op == "-": z = x - y
+                  elif op == "*": z = x * y
+                  elif op == "/":
+                      if y == 0 or x % y: return False
+                      z = x // y
+                  else: return False
+                  if not 0 < z <= p["limit"]:
+                      return False
+                  regs[d] = z
+                  seen.add(z)
+              return set(p["targets"]).issubset(seen)
+
+          configs = [
+              ("atakan-frontier-v1", "/tmp/santa/frontier",
+               ["8", "4200", "9", "10", "9", "20261123", "1500"]),
+              ("atakan-interface-closure-v1", "/tmp/santa/closure",
+               ["90", "26", "7", "20261123", "4150"]),
+          ]
+
+          jobs = [(pid, name, binary, args)
+                  for pid in puzzles for name, binary, args in configs]
+
+          def run(job):
+              pid, name, binary, args = job
+              p = puzzles[pid]
+              old = programs[pid]
+              header = (f"{pid} {p['limit']} {len(p['seeds'])} "
+                        f"{len(p['targets'])} {len(old)}\\n")
+              body = " ".join(map(str, p["seeds"])) + "\\n"
+              body += " ".join(map(str, p["targets"])) + "\\n"
+              body += "".join(f"{op} {a} {b} {d}\\n" for op, a, b, d in old)
+              started = time.time()
+              try:
+                  result = subprocess.run([binary, *args], input=header + body,
+                      text=True, capture_output=True, timeout=12)
+                  if result.returncode != 0 or not result.stdout.strip():
+                      return pid, name, None, "process-error", round(time.time()-started, 2)
+                  lines = result.stdout.splitlines()
+                  h = lines[0].split()
+                  if len(h) < 2 or h[0] != pid:
+                      return pid, name, None, "header-error", round(time.time()-started, 2)
+                  count = int(h[1])
+                  candidate = []
+                  for line in lines[1:1+count]:
+                      parts = line.split()
+                      if len(parts) != 4:
+                          return pid, name, None, "parse-error", round(time.time()-started, 2)
+                      op, a, b, d = parts
+                      candidate.append([op, int(a), int(b), int(d)])
+                  if len(candidate) != count or not validate(p, candidate):
+                      return pid, name, None, "invalid", round(time.time()-started, 2)
+                  if count >= len(old):
+                      return pid, name, None, "no-improvement", round(time.time()-started, 2)
+                  return pid, name, candidate, "improved", round(time.time()-started, 2)
+              except subprocess.TimeoutExpired:
+                  return pid, name, None, "timeout", round(time.time()-started, 2)
+              except Exception as exc:
+                  return pid, name, None, "error:" + str(exc)[:120], round(time.time()-started, 2)
+
+          started = time.time()
+          best = {pid: list(program) for pid, program in programs.items()}
+          origins = dict(baseline_origins)
+          counts = Counter()
+          gains = []
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              futures = [pool.submit(run, job) for job in jobs]
+              for index, future in enumerate(concurrent.futures.as_completed(futures), 1):
+                  pid, name, candidate, status, elapsed = future.result()
+                  counts[status] += 1
+                  if candidate is not None and len(candidate) < len(best[pid]):
+                      saving = len(best[pid]) - len(candidate)
+                      best[pid] = candidate
+                      origins[pid] = name
+                      gains.append((pid, name, saving))
+                  if index % 50 == 0:
+                      print(f"completed {index}/{len(jobs)}; improvements={len(gains)}; "
+                            f"seconds={time.time()-started:.1f}", flush=True)
+
+          def replay_all():
+              for pid, p in puzzles.items():
+                  if not validate(p, best[pid]):
+                      raise RuntimeError(f"Final exact replay failed for {pid}")
+          replay_all()
+
+          with open("outputs/atakan-full-search.csv", "w", newline="", encoding="utf-8") as f:
+              writer = csv.writer(f, lineterminator="\\n")
+              writer.writerow(["id", "program"])
+              for pid in puzzles:
+                  writer.writerow([pid, json.dumps(best[pid], separators=(",", ":"))])
+
+          with open("outputs/atakan-full-search-origins.csv", "w", newline="", encoding="utf-8") as f:
+              writer = csv.writer(f, lineterminator="\\n")
+              writer.writerow(["id", "selected_source", "instructions"])
+              for pid in puzzles:
+                  writer.writerow([pid, origins[pid], len(best[pid])])
+
+          total = sum(map(len, best.values()))
+          baseline_total = sum(map(len, programs.values()))
+          def sha(path):
+              h = hashlib.sha256()
+              with open(path, "rb") as f:
+                  for chunk in iter(lambda: f.read(1024*1024), b""): h.update(chunk)
+              return h.hexdigest()
+          report = {
+              "puzzles": len(puzzles),
+              "baseline_instructions": baseline_total,
+              "candidate_instructions": total,
+              "instructions_saved": baseline_total-total,
+              "valid_and_complete": len(puzzles),
+              "invalid_or_incomplete": 0,
+              "strictly_improved_puzzles": len(gains),
+              "run_status_counts": dict(counts),
+              "elapsed_seconds": round(time.time()-started, 2),
+              "candidate_sha256": sha("outputs/atakan-full-search.csv"),
+              "origins_sha256": sha("outputs/atakan-full-search-origins.csv"),
+              "puzzles_sha256": sha("data/puzzles.csv"),
+              "status": "Locally replay-validated; not submitted to Kaggle."
+          }
+          Path("outputs/atakan-full-search-report.json").write_text(
+              json.dumps(report, indent=2)+"\\n", encoding="utf-8")
+          Path("outputs/atakan-full-search-run-summary.txt").write_text(
+              "\\n".join(f"{pid},{name},{saving}" for pid,name,saving in gains)+"\\n",
+              encoding="utf-8")
+          print(json.dumps(report, indent=2), flush=True)
+          PY
+
+      - name: Upload verified Atakan search artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: santa-2026-atakan-full-search
+          path: |
+            outputs/atakan-full-search.csv
+            outputs/atakan-full-search-origins.csv
+            outputs/atakan-full-search-report.json
+            outputs/atakan-full-search-run-summary.txt
+            outputs/atakan-binaries.sha256
+            outputs/Atakan-NOTICE.md
+            outputs/Apache-2.0.txt
+            outputs/baseline-report.json
+          if-no-files-found: error
+          retention-days: 30
