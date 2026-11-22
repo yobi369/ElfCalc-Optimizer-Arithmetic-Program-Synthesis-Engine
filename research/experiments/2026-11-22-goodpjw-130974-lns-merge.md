@@ -44,3 +44,8 @@ A separate higher-budget local LNS pass was already running from the v71 130,981
 ## Cross-check with the earlier Atakan full-dataset bank
 
 Atakan full-dataset run 45052245963 produced 131,051 from a 131,052 parent (one instruction saved, one puzzle improved). Its output was independently compared with the 130,974 candidate. It was longer on 54 puzzles, equal on 946, and shorter on none. Therefore it does not change the 130,974 incumbent. The separate targeted Atakan search on the 200 highest-cost puzzles is still running.
+
+
+## Targeted Atakan frontier search — no gain in first half
+
+A separate local Atakan Apache-2.0 multiplier-frontier pass targeted the 200 highest-cost puzzles using two seeds. It was stopped after 208 of 400 puzzle/seed jobs completed: 207 no-improvement results and one timeout; no candidate was promoted. The earlier full-dataset Atakan output also had no rows shorter than 130,974. The current Wang Jakie seeded graph-search pass is being prioritized next.
