@@ -27,7 +27,7 @@ The submission CSV is not committed to the public repository. It can be regenera
 4. Extract `submission.csv`.
 5. Verify its SHA-256 against the value above.
 
-The parent workflow verifies the compressed parent archives, puzzle data hash, and parent candidate hashes; replays both parents and the merged output. The LNS workflow independently replays each accepted improvement and the final serialized candidate. The verified 131047 artifact from run 45048175847 is retained in the owner's private ChatGPT Library. The latest successful artifact is also stored in the owner's private ChatGPT Library under `Kaggle Competitions/Santa 2026 - Elf Calculator`.
+The parent workflow verifies the compressed parent archives, puzzle data hash, and parent candidate hashes; replays both parents and the merged output. The LNS workflow independently replays each accepted improvement and the final serialized candidate. The verified 131047 artifact from run 45048175847 is available in that GitHub Actions run's artifact store for its retention period. A local copy was generated for this working session; it has not been uploaded to the Library. The latest successful artifact is also stored in the owner's private ChatGPT Library under `Kaggle Competitions/Santa 2026 - Elf Calculator`.
 
 ## Submit through the Kaggle CLI
 
