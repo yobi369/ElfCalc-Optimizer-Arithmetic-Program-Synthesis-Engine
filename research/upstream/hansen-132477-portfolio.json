@@ -1,0 +1,58 @@
+{
+  "puzzles_sha256": "b0c70d849eca078a0e1cf9a4f7b47fd40b7435663f6f84de6725f84724500428",
+  "instructions": 132477,
+  "sha256": "208c1f7e839b893f103db0261bb06353fa5810b3a6544d18681a1e5ad7224be9",
+  "sources": [
+    {
+      "name": "repository",
+      "revision": "98956924beb5b47b72308d61793aa1a0e5e4cb02",
+      "path": "public-assisted/submission.csv",
+      "csv_sha256": "b7964c329818eadc9fab3a75d5d9fcce813a9c15fe5f799dcc580619022a8f60",
+      "full": true
+    },
+    {
+      "name": "asteriospanoras-196",
+      "url": "https://www.kaggle.com/datasets/asteriospanoras/santa-2026-elf-programs-and-experiments/versions/196",
+      "archive": "asteriospanoras-196.zip",
+      "archive_sha256": "71d54c19f6e8d8f0b0b855b5e7f9280946b46c8b3db83beebcf0ddcbed097cc5",
+      "member": "best_programs.csv",
+      "csv_sha256": "cf4a0065ff5f2aa7b70734cb1ac36c49539c8213abc2593f6e816b674f328aea",
+      "license": "Apache 2.0",
+      "full": true,
+      "replayed_instructions": 132584
+    },
+    {
+      "name": "asteriospanoras-372207578",
+      "url": "https://www.kaggle.com/code/asteriospanoras/santa-2026-best-public-score-a-gift-per-run?scriptVersionId=372207578",
+      "download_url": "https://www.kaggle.com/kernels/scriptcontent/372207578/download",
+      "notebook": "asteriospanoras-372207578.ipynb",
+      "notebook_sha256": "35b44d732044e006f359d05e6f7c262cea1cb000522ce2ebabbed2f15acb5d52",
+      "cell": 7,
+      "variable": "CHANGE",
+      "full": false
+    }
+  ],
+  "previous_sha256": "9996f5feda0eb2716e7b6f1fa59e03405a8e44237b42e5e2c812b0f976c084d7",
+  "improved": {
+    "scored_0571": [
+      189,
+      188,
+      "repository"
+    ],
+    "scored_0927": [
+      119,
+      118,
+      "asteriospanoras-196"
+    ],
+    "scored_0946": [
+      207,
+      206,
+      "asteriospanoras-372207578"
+    ]
+  },
+  "improved_credits": {
+    "scored_0571": "collaboration/register-search/spectral-regions-public-wins.csv; c42f416 portfolio: asteriospanoras-194 (Pardheev Krishna, Santa 2026 | 132997 validated programs). Search engines credited in the experiment notes.",
+    "scored_0927": "Sargis Khachatryan, Elf Calc | Backward Frontier Rewrite",
+    "scored_0946": "asteriospanoras-372207578"
+  }
+}
