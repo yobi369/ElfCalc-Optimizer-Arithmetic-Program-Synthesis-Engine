@@ -113,7 +113,8 @@ jobs:
                   elif op == '-': value = x - y
                   elif op == '*': value = x * y
                   else: value = x // y
-                  f.write(f'D {pid} 1\\n{op} {x} {y} {value}\\n')
+                  print(f'D {pid} 1', file=f)
+                  print(f'{op} {x} {y} {value}', file=f)
           with open('outputs/target-puzzles.txt','w') as f: f.write('\n'.join(chosen)+'\n')
           print('selected',len(chosen),'puzzles; top',ranked[:10])
           PY
