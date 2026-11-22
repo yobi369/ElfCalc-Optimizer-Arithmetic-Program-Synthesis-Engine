@@ -75,13 +75,18 @@ jobs:
             "alexchilton/rudolph-the-red-nosed-register-allocator"
             "ozertuu/santa-2026-starter-notebook"
           )
+          : > bundle/pull-status.txt
           for slug in "${slugs[@]}"; do
             name="${slug//\//-}"
             mkdir -p "bundle/$name"
             echo "Pulling $slug"
-            kaggle kernels pull "$slug" --path "bundle/$name" --metadata
+            if kaggle kernels pull "$slug" --path "bundle/$name" --metadata; then
+              echo "SUCCESS $slug" | tee -a bundle/pull-status.txt
+            else
+              echo "SKIPPED_OR_RESTRICTED $slug" | tee -a bundle/pull-status.txt
+            fi
           done
-          find bundle -type f -maxdepth 4 -print0 | sort -z | xargs -0 sha256sum > bundle/SHA256SUMS.txt
+          find bundle -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > bundle/SHA256SUMS.txt
 
       - name: Upload authenticated notebook source bundle
         if: steps.check-token.outputs.has_token == 'true'
