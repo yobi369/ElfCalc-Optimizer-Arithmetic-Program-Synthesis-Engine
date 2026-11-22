@@ -1,0 +1,49 @@
+name: Fetch public Santa solver notebooks
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fetch-public-kernel-sources.yml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrieve public Kaggle kernel metadata and source archives
+        shell: bash
+        run: |
+          set -u
+          mkdir -p bundle
+          slugs=(
+            "atakanaldemir/santa-2026-joint-recipes-for-large-puzzles"
+            "pablodiegoo/santa-2026-deterministic-atlas-solver"
+            "royalacecat/elf-calculator-residual-cut-search"
+            "prvsiyan/santa-2026-elf-calculator"
+            "romanrozen/santa-2026-elf-calculator"
+            "mizeroluckygall/elf-calculator-best-of-public-merge-polish"
+            "goodpjw2008/santa-2026-lns-cp-sat-recombine-lb-134-092"
+            "alexchilton/rudolph-the-red-nosed-register-allocator"
+            "ozertuu/santa-2026-starter-notebook"
+          )
+          for slug in "${slugs[@]}"; do
+            name="${slug//\//-}"
+            echo "Fetching $slug"
+            curl --location --retry 2 --silent --show-error "https://www.kaggle.com/api/v1/kernels/view/$slug" -o "bundle/$name-metadata.json" || true
+            curl --location --retry 2 --silent --show-error "https://www.kaggle.com/api/v1/kernels/scriptdownload/$slug" -o "bundle/$name-source.zip" || true
+            if [ -f "bundle/$name-source.zip" ]; then
+              echo "source $(stat -c%s "bundle/$name-source.zip") bytes"
+              unzip -l "bundle/$name-source.zip" | head -20 || true
+            fi
+          done
+          sha256sum bundle/* > bundle/SHA256SUMS.txt 2>/dev/null || true
+      - name: Upload notebook source research bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: santa-public-kernel-sources-2026-11-22
+          path: bundle/
+          retention-days: 30
