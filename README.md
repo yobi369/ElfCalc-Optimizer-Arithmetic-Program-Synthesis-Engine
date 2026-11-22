@@ -159,3 +159,5 @@ To be selected after reviewing the competition rules and any third-party solver 
 
 
 <!-- trigger latest public pool retrieval -->
+
+<!-- trigger latest pool v297 v18 -->
