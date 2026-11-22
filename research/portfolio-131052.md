@@ -60,3 +60,9 @@ The next work is to beat 131,052 through new, exact, per-puzzle search—not to 
 ## Submission status
 
 Prepared and independently replay-validated locally. **Not submitted to Kaggle.**
+
+## Additional public-frontier comparison
+
+The public Kindasomethin v33 checkpoint reports 132,018 instructions. Its published `row_attribution.csv` per-puzzle instruction counts were compared against this 131,052 candidate: **none of its 1,000 puzzle programs is shorter**. Its mixed-license program data was not imported. See the [public candidate and licensing audit](public-candidate-licensing-audit-2026-11-22.md).
+
+The GoodPJW v151 public portfolio reports 131,050, only two instructions below this clean candidate, but its inherited program rows retain original source terms and the downloaded CSV does not expose sufficient row-level lineage. We did not adopt those three marginal improvements. Pardheev's 131,025 and Ozertuu's 131,029 candidates were also excluded because their license metadata is unspecified or unknown.
