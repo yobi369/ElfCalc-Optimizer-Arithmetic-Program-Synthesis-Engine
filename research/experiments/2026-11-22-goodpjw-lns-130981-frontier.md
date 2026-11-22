@@ -51,3 +51,8 @@ Search launched locally on 2026-11-22. Results will be appended after the run co
 ## Incumbent update during the run
 
 After this search started, a newer GoodPJW v72 source-embedded patch was reconstructed and independently replayed at **130,976** (see `2026-11-22-goodpjw-130976-independent-replay.md`). This LNS run remains based on the pinned v71 130,981 input because it was already underway. Its output will therefore be treated as an auxiliary candidate bank and merged puzzle-by-puzzle against 130,976; no row from this run can displace a shorter v72 program. The promoted result must be strictly below 130,976 and pass full replay.
+
+
+## Run outcome and stop decision
+
+The higher-budget pass was stopped after 1,014 of 2,000 puzzle/configuration jobs completed. All 1,014 reported no improvement; no candidate was promoted. It was stopped to redirect compute toward the seeded Wang Jakie graph-search experiment and a follow-up LNS pass using the configurations that produced gains in the earlier full-dataset run. This is a negative result for these two new configurations, not evidence that the optimizer or the 130,981 portfolio is globally optimal.
