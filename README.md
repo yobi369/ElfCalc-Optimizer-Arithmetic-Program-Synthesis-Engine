@@ -20,6 +20,21 @@ bash scripts/fetch_kaggle_data.sh
 
 The script restores the official puzzle and sample-submission files into the ignored local `data/` directory, so you do not need to attach those files to every coding session.
 
+## Competitive reference checkpoint (22 November 2026)
+
+A public Apache-2.0 reference checkpoint is available at **132,515 total instructions** across all 1,000 scored puzzles. It was previously accepted by Kaggle as submission 58675401. We retrieved the exact upstream artifact, verified both upstream SHA-256 fingerprints, and independently replayed all 1,000 programs against the supplied `puzzles.csv` in this project:
+
+- Exact local replay: **1,000/1,000 valid and complete**, zero missing targets.
+- Total: **132,515** instructions; median 118; minimum 2; maximum 277.
+- CSV SHA-256: `d984166fee5681afc84382afda0d0eaf009922d88c192a9b8fa5dbc9dbbdc5d3`.
+- Provenance and license: [THIRD_PARTY.md](THIRD_PARTY.md), [original upstream notice](research/upstream/132515-NOTICE.md), and [Apache-2.0](licenses/Apache-2.0.txt).
+
+**Attribution:** this is an inherited public-reference merge, not a score independently achieved by this repository. Preserve all upstream credits. Our earlier independent constructive candidate scored 275,767; it remains a useful reproducible baseline for research, but it is not the strongest available candidate. Do not claim 132,515 as an original algorithmic result.
+
+The workflow [fetch-public-frontier.yml](.github/workflows/fetch-public-frontier.yml) retrieves the pinned upstream checkpoint, verifies its compressed and uncompressed hashes, and publishes a temporary GitHub Actions artifact. The raw Kaggle competition CSVs remain excluded from this public repository.
+
+The current public standings snapshot checked on 22 November listed leading scores near 126,659. The 132,515 checkpoint is therefore a strong validated starting point, not a claim of first place. Future improvements must be measured per puzzle against this frozen baseline and independently replayed before replacing it.
+
 ## Reproduce the baseline audit
 
 Place the official files in `data/` (the directory is git-ignored), then run:
