@@ -1,0 +1,9 @@
+id,selected_instructions,selected_source,upstream_lineage
+scored_0027,103,Hansen0223 132477,"Hiyohane independent program, commit e12c5f79825a; generated from official inputs"
+scored_0073,115,Hansen0223 132477,"Hansen0223 independent solver; generated from official inputs"
+scored_0190,114,Hansen0223 132477,"Hansen0223 target-partition independent candidate; solver credits in generative NOTICE"
+scored_0362,96,Hansen0223 132477,"Hansen0223 independent solver; generated from official inputs"
+scored_0484,118,Hansen0223 132477,"Wang Jakie; Hiyohane; GoodPJW v11 and credited public sources; see preserved notices"
+scored_0803,119,Hansen0223 132477,"Hansen0223 independent solver; generated from official inputs"
+scored_0893,120,Hansen0223 132477,"Wang Jakie; Hiyohane; GoodPJW v12 and credited public sources; see preserved notices"
+scored_0995,124,Hansen0223 132477,"Hansen0223 independent solver; generated from official inputs"
