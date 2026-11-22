@@ -37,6 +37,8 @@ The workflow [fetch-public-frontier.yml](.github/workflows/fetch-public-frontier
 
 The current public standings snapshot checked on 22 November listed leading scores near 126,659. The 132,515 checkpoint is therefore a strong validated starting point, not a claim of first place. Future improvements must be measured per puzzle against this frozen baseline and independently replayed before replacing it.
 
+The current dataset-level score floor and hardest-puzzle triage are documented in [the score-landscape report](research/score-landscape-2026-11-22.md). Reproduce the replay audit and per-puzzle breakdown with [analyze_score_landscape.py](scripts/analyze_score_landscape.py).
+
 ## Reproduce the baseline audit
 
 Place the official files in `data/` (the directory is git-ignored), then run:
