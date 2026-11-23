@@ -79,6 +79,9 @@ jobs:
             "alexchilton/rudolph-the-red-nosed-register-allocator"
             "avazaku/elf-calc-backward-frontier-rewrite"
             "ozertuu/santa-2026-starter-notebook"
+            "ishankarnick/santa-2026-frontier-programs-130-994"
+            "muhakabartay/santa-2026-strict-verifier-public-merge-anatomy"
+            "vigneshsankar1962/santa-2026-free-order-cp-sat-dag-optimizer"
           )
           : > bundle/pull-status.txt
           for slug in "${slugs[@]}"; do
@@ -120,6 +123,7 @@ jobs:
             "vigneshsankar1962/santa-2026-free-order-cp-sat-dag-optimizer"
             "vigneshsankar1962/santa-2026-132k-sota-frontier-synthesis-portfolio"
             "pablodiegoo/santa-2026-deterministic-atlas-solver"
+            "avazaku/elf-calc-backward-frontier-rewrite"
           )
           : > bundle/candidate-outputs-status.txt
           for slug in "${slugs[@]}"; do
