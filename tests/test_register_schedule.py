@@ -26,6 +26,26 @@ class RegisterScheduleTests(unittest.TestCase):
         self.assertEqual(len(program), 2)
         self.assertEqual(program[0].destination, 0)
 
+    def test_rejects_dag_with_incorrect_declared_result(self):
+        class Operation:
+            left = 2
+            operator = "+"
+            right = 3
+            result = 6
+
+        with self.assertRaisesRegex(ValueError, "result mismatch"):
+            schedule_value_dag((Operation(),), (2, 3), 10)
+
+    def test_rejects_inexact_dag_division(self):
+        class Operation:
+            left = 7
+            operator = "/"
+            right = 2
+            result = 3
+
+        with self.assertRaisesRegex(ValueError, "division must be exact"):
+            schedule_value_dag((Operation(),), (7, 2), 10)
+
     def test_rejects_dag_with_missing_operand(self):
         class Operation:
             left = 100
