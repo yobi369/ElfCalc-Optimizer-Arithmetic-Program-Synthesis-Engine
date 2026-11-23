@@ -86,16 +86,40 @@ def _pair_recipes(values: tuple[int, ...], limit: int):
                     yield ArithmeticRelation(right, "/", left, result)
 
 
-def _target_yield(candidate: int, available: frozenset[int], missing: frozenset[int], limit: int):
-    """Return deterministic one-step target recipes unlocked by candidate."""
-    found: dict[int, ArithmeticRelation] = {}
-    for other in sorted(available):
-        for left, right in ((candidate, other), (other, candidate)):
-            for operator in ("+", "-", "*", "/"):
-                result = _apply(left, operator, right, limit)
-                if result in missing and result not in found:
-                    found[result] = ArithmeticRelation(left, operator, right, result)
-    return tuple(found[target] for target in sorted(found))
+def _inverse_target_candidates(target: int, other: int, limit: int):
+    """Yield candidate intermediates that combine with other to make target."""
+    options = (
+        (target - other, "+", target - other, other),
+        (target + other, "-", target + other, other),
+        (other - target, "-", other, other - target),
+        (target // other if other and target % other == 0 else 0,
+         "*", target // other if other and target % other == 0 else 0, other),
+        (target * other, "/", target * other, other),
+        (other // target if target and other % target == 0 else 0,
+         "/", other, other // target if target and other % target == 0 else 0),
+    )
+    for candidate, operator, left, right in options:
+        if 0 < candidate <= limit:
+            yield candidate, ArithmeticRelation(left, operator, right, target)
+
+
+def _candidate_target_yields(
+    recipes_by_result: dict[int, ArithmeticRelation],
+    available: tuple[int, ...],
+    missing: frozenset[int],
+    limit: int,
+) -> dict[int, tuple[ArithmeticRelation, ...]]:
+    """Invert target equations so only target-relevant candidates are scored."""
+    found: dict[int, dict[int, ArithmeticRelation]] = {}
+    for target in sorted(missing):
+        for other in available:
+            for candidate, relation in _inverse_target_candidates(target, other, limit):
+                if candidate in recipes_by_result and candidate != target:
+                    found.setdefault(candidate, {}).setdefault(target, relation)
+    return {
+        candidate: tuple(targets[target] for target in sorted(targets))
+        for candidate, targets in found.items()
+    }
 
 
 def plan_shared_intermediates(
@@ -134,15 +158,23 @@ def plan_shared_intermediates(
     while missing:
         frontier = tuple(sorted(available))
         best = None
-        seen_results: set[int] = set()
+        recipes_by_result: dict[int, ArithmeticRelation] = {}
         for recipe in _pair_recipes(frontier, value_limit):
-            candidate = recipe.result
-            if candidate in available or candidate in seen_results:
-                continue
-            seen_results.add(candidate)
+            if recipe.result not in available:
+                recipes_by_result.setdefault(recipe.result, recipe)
 
+        # Instead of testing every possible intermediate against every known
+        # value, invert each target equation. Work scales with targets × frontier
+        # plus the pair-recipe frontier, not candidates × frontier.
+        yields = _candidate_target_yields(
+            recipes_by_result, frontier, frozenset(missing), value_limit
+        )
+        for candidate, recipe in recipes_by_result.items():
             immediate = candidate in missing
-            unlocked = _target_yield(candidate, frozenset(available), frozenset(missing - {candidate}), value_limit)
+            unlocked = tuple(
+                relation for relation in yields.get(candidate, ())
+                if relation.result != candidate
+            )
             gain = len(unlocked) + int(immediate)
             if gain == 0:
                 continue
