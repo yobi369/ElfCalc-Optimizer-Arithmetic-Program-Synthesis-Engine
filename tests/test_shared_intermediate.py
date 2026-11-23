@@ -56,7 +56,7 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
     def test_direct_targets_are_prioritized_over_speculative_intermediates(self):
         plan = plan_shared_intermediates([2, 3, 4], [5, 14], 20)
         self.assertTrue(plan.operations[0].is_target)
-        self.assertIn(plan.operations[0].result, {5, 8, 12})
+        self.assertEqual(plan.operations[0].result, 5)
         self.assertEqual(plan.missing_targets, ())
 
     def test_generated_operations_stay_within_value_limit(self):
