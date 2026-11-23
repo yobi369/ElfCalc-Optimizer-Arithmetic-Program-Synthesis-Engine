@@ -10,6 +10,7 @@ from __future__ import annotations
 from .machine import Instruction, MAX_INSTRUCTIONS
 from .puzzle import Puzzle
 from .validation import validate_program
+from .shared_solver import solve_shared_intermediate
 
 
 class _RegisterBuilder:
@@ -572,6 +573,10 @@ def solve_constructive(puzzle: Puzzle, include_shared_dag: bool = True) -> tuple
     if not set(puzzle.targets) - set(puzzle.starting_values):
         return ()
     candidates = []
+    try:
+        candidates.append(solve_shared_intermediate(puzzle))
+    except (ValueError, KeyError, RecursionError):
+        pass
     if include_shared_dag:
         try:
             candidates.append(_solve_shared_intermediate_dag(puzzle))
