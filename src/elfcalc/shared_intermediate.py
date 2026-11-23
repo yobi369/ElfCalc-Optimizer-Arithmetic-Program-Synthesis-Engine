@@ -138,26 +138,43 @@ def _best_two_intermediate_chain(
     missing: frozenset[int],
     limit: int,
 ):
-    """Find the best exact two-intermediate chain that unlocks missing targets."""
-    chains: dict[int, dict[int, dict[int, tuple[ArithmeticRelation, ArithmeticRelation]]]] = {}
+    """Find the best exact two-intermediate chain that unlocks missing targets.
+
+    Build the target-side bridge index once, then join it against the
+    one-operation frontier. This avoids a nested inverse search over every
+    target × first-anchor × second-anchor combination.
+    """
+    bridge_targets: dict[int, dict[int, ArithmeticRelation]] = {}
     for target in sorted(missing):
         for target_anchor in available:
             for bridge, target_recipe in _inverse_target_candidates(target, target_anchor, limit):
                 if bridge in available or bridge == target:
                     continue
-                for first_anchor in available:
-                    for first, bridge_recipe in _inverse_target_candidates(bridge, first_anchor, limit):
-                        if first not in recipes_by_result or first in missing or first == bridge:
-                            continue
-                        targets_for_bridge = chains.setdefault(first, {}).setdefault(bridge, {})
-                        previous = targets_for_bridge.get(target)
-                        candidate_pair = (bridge_recipe, target_recipe)
-                        if previous is None or (
-                            _recipe_order(candidate_pair[0]), _recipe_order(candidate_pair[1])
-                        ) < (
-                            _recipe_order(previous[0]), _recipe_order(previous[1])
-                        ):
-                            targets_for_bridge[target] = candidate_pair
+                targets_for_bridge = bridge_targets.setdefault(bridge, {})
+                previous = targets_for_bridge.get(target)
+                if previous is None or _recipe_order(target_recipe) < _recipe_order(previous):
+                    targets_for_bridge[target] = target_recipe
+
+    chains: dict[int, dict[int, dict[int, tuple[ArithmeticRelation, ArithmeticRelation]]]] = {}
+    for first in sorted(recipes_by_result):
+        if first in missing:
+            continue
+        for first_anchor in available:
+            for bridge_recipe in _pair_recipes_for_pair(first, first_anchor, limit):
+                bridge = bridge_recipe.result
+                if bridge not in bridge_targets or bridge in available or bridge == first:
+                    continue
+                targets_for_bridge = chains.setdefault(first, {}).setdefault(bridge, {})
+                for target, target_recipe in bridge_targets[bridge].items():
+                    previous = targets_for_bridge.get(target)
+                    candidate_pair = (bridge_recipe, target_recipe)
+                    if previous is None or (
+                        _recipe_order(candidate_pair[0]), _recipe_order(candidate_pair[1])
+                    ) < (
+                        _recipe_order(previous[0]), _recipe_order(previous[1])
+                    ):
+                        targets_for_bridge[target] = candidate_pair
+
     best = None
     for first in sorted(chains):
         for bridge in sorted(chains[first]):
