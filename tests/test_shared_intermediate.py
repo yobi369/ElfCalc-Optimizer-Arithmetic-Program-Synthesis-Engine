@@ -22,6 +22,12 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             plan_shared_intermediates([7, 9], [63], 20)
 
+    def test_direct_targets_are_prioritized_over_speculative_intermediates(self):
+        plan = plan_shared_intermediates([2, 3, 4], [5, 8, 12], 20)
+        self.assertTrue(plan.operations[0].is_target)
+        self.assertEqual(plan.operations[0].result, 5)
+        self.assertEqual(plan.missing_targets, ())
+
     def test_generated_operations_stay_within_value_limit(self):
         plan = plan_shared_intermediates([7, 9], [16, 18], 20)
         self.assertEqual(plan.missing_targets, ())
