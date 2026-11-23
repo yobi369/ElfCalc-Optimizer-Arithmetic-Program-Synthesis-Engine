@@ -52,13 +52,18 @@ class RegisterScheduleTests(unittest.TestCase):
 
     def test_rejects_cyclic_value_dag(self):
         class Operation:
-            left = 5
-            operator = "+"
-            right = 2
-            result = 7
+            def __init__(self, left, right, result):
+                self.left = left
+                self.operator = "+"
+                self.right = right
+                self.result = result
 
+        cycle = (
+            Operation(9, 2, 7),
+            Operation(7, 2, 9),
+        )
         with self.assertRaisesRegex(ValueError, "cycle"):
-            schedule_value_dag((Operation(),), (2, 3), 20)
+            schedule_value_dag(cycle, (2, 3), 20)
 
     def test_rejects_dag_with_incorrect_declared_result(self):
         class Operation:
