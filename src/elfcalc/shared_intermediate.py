@@ -132,6 +132,69 @@ def _candidate_target_yields(
     }
 
 
+def _best_two_intermediate_chain(
+    recipes_by_result: dict[int, ArithmeticRelation],
+    available: tuple[int, ...],
+    missing: frozenset[int],
+    limit: int,
+):
+    """Find the best exact two-intermediate chain that unlocks missing targets."""
+    chains: dict[int, dict[int, dict[int, tuple[ArithmeticRelation, ArithmeticRelation]]]] = {}
+    for target in sorted(missing):
+        for target_anchor in available:
+            for bridge, target_recipe in _inverse_target_candidates(target, target_anchor, limit):
+                if bridge in available or bridge == target:
+                    continue
+                for first_anchor in available:
+                    for first, bridge_recipe in _inverse_target_candidates(bridge, first_anchor, limit):
+                        if first not in recipes_by_result or first in missing or first == bridge:
+                            continue
+                        targets_for_bridge = chains.setdefault(first, {}).setdefault(bridge, {})
+                        previous = targets_for_bridge.get(target)
+                        candidate_pair = (bridge_recipe, target_recipe)
+                        if previous is None or (
+                            _recipe_order(candidate_pair[0]), _recipe_order(candidate_pair[1])
+                        ) < (
+                            _recipe_order(previous[0]), _recipe_order(previous[1])
+                        ):
+                            targets_for_bridge[target] = candidate_pair
+    best = None
+    for first in sorted(chains):
+        for bridge in sorted(chains[first]):
+            target_map = chains[first][bridge]
+            recipes = tuple(target_map[target] for target in sorted(target_map))
+            first_recipe = recipes_by_result[first]
+            bridge_recipe = recipes[0][0]
+            target_recipes = tuple(pair[1] for pair in recipes)
+            rank = (len(target_recipes), -first, -bridge, tuple(_recipe_order(r) for r in target_recipes))
+            if best is None or rank > best[0]:
+                best = (rank, first_recipe, bridge_recipe, target_recipes)
+    return None if best is None else best[1:]
+
+
+def _extend_recipe_frontier(
+    recipes_by_result: dict[int, ArithmeticRelation],
+    available: set[int],
+    newly_available: set[int],
+    limit: int,
+) -> None:
+    """Incrementally add recipes involving newly available values."""
+    for value in newly_available:
+        recipes_by_result.pop(value, None)
+    ordered_available = tuple(sorted(available))
+    ordered_new = tuple(sorted(newly_available))
+    new_set = set(newly_available)
+    for value in ordered_new:
+        for other in ordered_available:
+            if other in new_set and other < value:
+                continue
+            for recipe in _pair_recipes_for_pair(value, other, limit):
+                if recipe.result in available:
+                    continue
+                previous = recipes_by_result.get(recipe.result)
+                if previous is None or _recipe_order(recipe) < _recipe_order(previous):
+                    recipes_by_result[recipe.result] = recipe
+
 def plan_shared_intermediates(
     starting_values: tuple[int, ...] | list[int],
     targets: tuple[int, ...] | list[int],
@@ -206,7 +269,39 @@ def plan_shared_intermediates(
                 best = (rank, recipe, unlocked, immediate)
 
         if best is None:
-            break
+            if intermediate_count + 2 > max_intermediates:
+                break
+            chain = _best_two_intermediate_chain(
+                recipes_by_result, frontier, frozenset(missing), value_limit
+            )
+            if chain is None:
+                break
+            first_recipe, bridge_recipe, target_recipes = chain
+            operations.append(PlannedOperation(
+                first_recipe.left, first_recipe.operator, first_recipe.right,
+                first_recipe.result, False,
+            ))
+            operations.append(PlannedOperation(
+                bridge_recipe.left, bridge_recipe.operator, bridge_recipe.right,
+                bridge_recipe.result, False,
+            ))
+            available.update((first_recipe.result, bridge_recipe.result))
+            intermediate_count += 2
+            newly_available = {first_recipe.result, bridge_recipe.result}
+            for target_recipe in target_recipes:
+                if target_recipe.result not in missing:
+                    continue
+                operations.append(PlannedOperation(
+                    target_recipe.left, target_recipe.operator, target_recipe.right,
+                    target_recipe.result, True,
+                ))
+                available.add(target_recipe.result)
+                newly_available.add(target_recipe.result)
+                missing.remove(target_recipe.result)
+            _extend_recipe_frontier(
+                recipes_by_result, available, newly_available, value_limit
+            )
+            continue
 
         _, recipe, unlocked, immediate = best
         is_target = recipe.result in missing
@@ -240,21 +335,9 @@ def plan_shared_intermediates(
         # Maintain the reachable-recipe frontier incrementally. Every unordered
         # value pair is visited once when its newer endpoint enters the frontier,
         # instead of rebuilding the full O(n^2) pair table on every greedy round.
-        for value in newly_available:
-            recipes_by_result.pop(value, None)
-        ordered_available = tuple(sorted(available))
-        ordered_new = tuple(sorted(newly_available))
-        new_set = set(newly_available)
-        for value in ordered_new:
-            for other in ordered_available:
-                if other in new_set and other < value:
-                    continue
-                for recipe in _pair_recipes_for_pair(value, other, value_limit):
-                    if recipe.result in available:
-                        continue
-                    previous = recipes_by_result.get(recipe.result)
-                    if previous is None or _recipe_order(recipe) < _recipe_order(previous):
-                        recipes_by_result[recipe.result] = recipe
+        _extend_recipe_frontier(
+            recipes_by_result, available, newly_available, value_limit
+        )
 
     covered = frozenset(set(goals).difference(missing))
     return SharedIntermediatePlan(
