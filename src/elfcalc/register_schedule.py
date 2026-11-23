@@ -12,6 +12,40 @@ from typing import Sequence
 from .machine import ArithmeticMachine, Instruction, MachineError, REGISTER_COUNT
 
 
+def _reorder_for_liveness(operations: Sequence[object], starting_values: Sequence[int]) -> tuple[object, ...]:
+    """Topologically reorder ready DAG nodes to reduce simultaneously live values."""
+    pending = list(enumerate(operations))
+    operations = _reorder_for_liveness(operations, starting_values)
+
+    remaining = Counter()
+    for operation in operations:
+        remaining[operation.left] += 1
+        remaining[operation.right] += 1
+    available = set(starting_values)
+    ordered = []
+    while pending:
+        ready = [(index, op) for index, op in pending if op.left in available and op.right in available]
+        if not ready:
+            raise ValueError("DAG contains a cycle, duplicate result, or missing dependency")
+        ranked = []
+        for index, op in ready:
+            if op.result in available:
+                raise ValueError("DAG result duplicates an already available value")
+            uses = Counter((op.left, op.right))
+            freed = sum(1 for value, count in uses.items() if remaining[value] == count)
+            live_after = sum(1 for value in available if remaining[value] - uses[value] > 0)
+            if remaining[op.result] > 0:
+                live_after += 1
+            is_target = bool(getattr(op, "is_target", False))
+            ranked.append(((live_after, -freed, not is_target, op.result, index), index, op))
+        _, chosen_index, chosen = min(ranked, key=lambda item: item[0])
+        ordered.append(chosen)
+        remaining[chosen.left] -= 1
+        remaining[chosen.right] -= 1
+        available.add(chosen.result)
+        pending = [(index, op) for index, op in pending if index != chosen_index]
+    return tuple(ordered)
+
 def schedule_value_dag(operations: Sequence[object], starting_values: Sequence[int],
                        value_limit: int) -> tuple[Instruction, ...]:
     """Lower a topologically ordered value DAG into a 48-register program.
