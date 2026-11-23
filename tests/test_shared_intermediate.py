@@ -78,7 +78,7 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         self.assertEqual(plan.covered_targets, frozenset({16}))
         self.assertEqual(plan.missing_targets, ())
         self.assertEqual(plan.intermediate_count, 2)
-        self.assertEqual(tuple(op.result for op in plan.operations), (5, 8, 16))
+        self.assertEqual(tuple(op.result for op in plan.operations), (4, 8, 16))
 
     def test_two_intermediate_chain_respects_budget(self):
         plan = plan_shared_intermediates([2, 3], [16], 20, max_intermediates=1)
