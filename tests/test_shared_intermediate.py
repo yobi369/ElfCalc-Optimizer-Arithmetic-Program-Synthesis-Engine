@@ -1,6 +1,11 @@
 import unittest
 
-from elfcalc.shared_intermediate import (\n    _apply,\n    _candidate_target_yields,\n    _pair_recipes,\n    plan_shared_intermediates,\n)
+from elfcalc.shared_intermediate import (
+    _apply,
+    _candidate_target_yields,
+    _pair_recipes,
+    plan_shared_intermediates,
+)
 
 
 class SharedIntermediatePlannerTests(unittest.TestCase):
