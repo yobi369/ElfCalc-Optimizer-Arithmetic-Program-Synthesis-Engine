@@ -60,30 +60,40 @@ def _apply(left: int, operator: str, right: int, limit: int) -> int | None:
     return result
 
 
+def _pair_recipes_for_pair(left: int, right: int, limit: int):
+    """Yield legal recipes for one unordered pair of available values."""
+    if left > right:
+        left, right = right, left
+    for operator in ("+", "*"):
+        result = _apply(left, operator, right, limit)
+        if result is not None:
+            yield ArithmeticRelation(left, operator, right, result)
+    if right > left:
+        result = _apply(right, "-", left, limit)
+        if result is not None:
+            yield ArithmeticRelation(right, "-", left, result)
+    if right and left % right == 0:
+        result = _apply(left, "/", right, limit)
+        if result is not None:
+            yield ArithmeticRelation(left, "/", right, result)
+    if left and right % left == 0:
+        result = _apply(right, "/", left, limit)
+        if result is not None:
+            yield ArithmeticRelation(right, "/", left, result)
+
+
 def _pair_recipes(values: tuple[int, ...], limit: int):
     """Yield canonical, exact one-instruction results from the value frontier."""
     for index, left in enumerate(values):
         for right in values[index:]:
-            for operator in ("+", "*"):
-                result = _apply(left, operator, right, limit)
-                if result is not None:
-                    yield ArithmeticRelation(left, operator, right, result)
-            if left > right:
-                result = _apply(left, "-", right, limit)
-                if result is not None:
-                    yield ArithmeticRelation(left, "-", right, result)
-            elif right > left:
-                result = _apply(right, "-", left, limit)
-                if result is not None:
-                    yield ArithmeticRelation(right, "-", left, result)
-            if right and left % right == 0:
-                result = _apply(left, "/", right, limit)
-                if result is not None:
-                    yield ArithmeticRelation(left, "/", right, result)
-            if left and right % left == 0:
-                result = _apply(right, "/", left, limit)
-                if result is not None:
-                    yield ArithmeticRelation(right, "/", left, result)
+            yield from _pair_recipes_for_pair(left, right, limit)
+
+
+def _recipe_order(recipe: ArithmeticRelation) -> tuple[int, int, int, int, int]:
+    """Match the canonical pair/operator order used by the full frontier scan."""
+    operator_order = {"+": 0, "*": 1, "-": 2, "/": 3}
+    low, high = sorted((recipe.left, recipe.right))
+    return (low, high, operator_order[recipe.operator], recipe.left, recipe.right)
 
 
 def _inverse_target_candidates(target: int, other: int, limit: int):
@@ -154,14 +164,16 @@ def plan_shared_intermediates(
     missing = set(goals).difference(available)
     operations: list[PlannedOperation] = []
     intermediate_count = 0
+    recipes_by_result: dict[int, ArithmeticRelation] = {}
+    for recipe in _pair_recipes(tuple(sorted(available)), value_limit):
+        if recipe.result not in available:
+            previous = recipes_by_result.get(recipe.result)
+            if previous is None or _recipe_order(recipe) < _recipe_order(previous):
+                recipes_by_result[recipe.result] = recipe
 
     while missing:
         frontier = tuple(sorted(available))
         best = None
-        recipes_by_result: dict[int, ArithmeticRelation] = {}
-        for recipe in _pair_recipes(frontier, value_limit):
-            if recipe.result not in available:
-                recipes_by_result.setdefault(recipe.result, recipe)
 
         # Instead of testing every possible intermediate against every known
         # value, invert each target equation. Work scales with targets × frontier
@@ -203,6 +215,7 @@ def plan_shared_intermediates(
                 operations.pop()
                 break
 
+        newly_available = {recipe.result}
         for target_recipe in unlocked:
             if target_recipe.result not in missing:
                 continue
@@ -214,7 +227,27 @@ def plan_shared_intermediates(
                 True,
             ))
             available.add(target_recipe.result)
+            newly_available.add(target_recipe.result)
             missing.remove(target_recipe.result)
+
+        # Maintain the reachable-recipe frontier incrementally. Every unordered
+        # value pair is visited once when its newer endpoint enters the frontier,
+        # instead of rebuilding the full O(n^2) pair table on every greedy round.
+        for value in newly_available:
+            recipes_by_result.pop(value, None)
+        ordered_available = tuple(sorted(available))
+        ordered_new = tuple(sorted(newly_available))
+        new_set = set(newly_available)
+        for value in ordered_new:
+            for other in ordered_available:
+                if other in new_set and other < value:
+                    continue
+                for recipe in _pair_recipes_for_pair(value, other, value_limit):
+                    if recipe.result in available:
+                        continue
+                    previous = recipes_by_result.get(recipe.result)
+                    if previous is None or _recipe_order(recipe) < _recipe_order(previous):
+                        recipes_by_result[recipe.result] = recipe
 
     covered = frozenset(set(goals).difference(missing))
     return SharedIntermediatePlan(
