@@ -147,9 +147,10 @@ def plan_shared_intermediates(
             if gain == 0:
                 continue
 
-            # Maximize newly covered targets per one instruction; deterministic
-            # tie-breaks prefer direct target production, then smaller values.
-            rank = (gain, int(immediate), -candidate, recipe.operator, -recipe.left, -recipe.right)
+            # Consume a directly reachable target before speculative
+            # intermediates: it costs one instruction and cannot be made cheaper
+            # by postponing it. Among equal classes, maximize one-step target yield.
+            rank = (int(immediate), gain, -candidate, recipe.operator, -recipe.left, -recipe.right)
             if best is None or rank > best[0]:
                 best = (rank, recipe, unlocked, immediate)
 
