@@ -24,6 +24,7 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         self.assertEqual(plan.missing_targets, ())
         self.assertEqual(plan.intermediate_count, 1)
         self.assertEqual(plan.instruction_count, 3)
+        self.assertEqual(plan.operations[0].result, 4)
 
     def test_inverse_target_cones_match_brute_force_relations(self):
         available = (2, 3, 4, 6, 8, 12)
