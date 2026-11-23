@@ -87,7 +87,7 @@ class RegisterScheduleTests(unittest.TestCase):
             right = 2
             result = 102
 
-        with self.assertRaisesRegex(ValueError, "missing operand"):
+        with self.assertRaisesRegex(ValueError, "missing dependency"):
             schedule_value_dag((Operation(),), (2, 3), 200)
 
 
