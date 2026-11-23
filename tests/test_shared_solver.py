@@ -13,6 +13,13 @@ class SharedIntermediateSolverTests(unittest.TestCase):
         self.assertTrue(result.complete, result.error)
         self.assertEqual(len(program), 3)
 
+    def test_solves_two_intermediate_chain_end_to_end(self):
+        puzzle = Puzzle("shared_solver_two_hop", (2, 3), (16,), 20)
+        program = solve_shared_intermediate(puzzle)
+        result = validate_program(puzzle, program)
+        self.assertTrue(result.complete, result.error)
+        self.assertEqual(len(program), 3)
+
     def test_returns_empty_program_when_targets_are_initial(self):
         puzzle = Puzzle("shared_solver_initial", (2, 3), (2, 3), 10)
         self.assertEqual(solve_shared_intermediate(puzzle), ())
