@@ -196,3 +196,13 @@ Regression coverage includes two interleaved dependency chains where the origina
 
 This improves the lowering layer's ability to fit a valid DAG into the register bank. It does not change the DAG's arithmetic instruction count and has not yet been shown to reduce the full competition score. The next research step is to make DAG selection itself aware of liveness, so candidate intermediates are priced by both target yield and the register pressure they create.
 
+## Target-relevant frontier filtering — 23 November 2026
+
+The greedy selector no longer scans every generated pair recipe at every round. It now scores only the union of:
+- values that appear in the inverse target-cone index; and
+- directly reachable missing targets.
+
+All other one-step recipes have zero immediate target yield and cannot win the current greedy objective, so excluding them from the ranking loop preserves the selected candidate while reducing avoidable frontier scans. A deterministic regression assertion locks the chosen shared intermediate for the two-target fixture. CI passed all 67 tests on Python 3.10, 3.11, and 3.12.
+
+The planner is still greedy and one-step. This optimization reduces ranking work; it does not establish a full-dataset instruction reduction.
+
