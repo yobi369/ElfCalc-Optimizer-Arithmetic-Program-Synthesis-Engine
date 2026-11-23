@@ -18,10 +18,14 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         self.assertEqual(plan.intermediate_count, 1)
         self.assertEqual(plan.instruction_count, 3)
 
-    def test_respects_value_limit(self):
-        plan = plan_shared_intermediates([7, 9], [63], 20)
-        self.assertEqual(plan.covered_targets, frozenset())
-        self.assertEqual(plan.missing_targets, (63,))
+    def test_rejects_target_above_value_limit(self):
+        with self.assertRaises(ValueError):
+            plan_shared_intermediates([7, 9], [63], 20)
+
+    def test_generated_operations_stay_within_value_limit(self):
+        plan = plan_shared_intermediates([7, 9], [16, 18], 20)
+        self.assertEqual(plan.missing_targets, ())
+        self.assertTrue(all(0 < op.result <= 20 for op in plan.operations))
 
     def test_initial_targets_are_already_covered(self):
         plan = plan_shared_intermediates([2, 3], [2, 3], 10)
