@@ -39,6 +39,30 @@ def schedule_value_dag(operations: Sequence[object], starting_values: Sequence[i
 
     program: list[Instruction] = []
     for operation in operations:
+        if any(type(value) is not int for value in (
+            operation.left, operation.right, operation.result
+        )):
+            raise ValueError("DAG operands and results must be integers")
+        if operation.operator not in {"+", "-", "*", "/"}:
+            raise ValueError(f"unsupported DAG operator: {operation.operator!r}")
+        if operation.operator == "+":
+            expected = operation.left + operation.right
+        elif operation.operator == "-":
+            expected = operation.left - operation.right
+        elif operation.operator == "*":
+            expected = operation.left * operation.right
+        else:
+            if operation.right == 0 or operation.left % operation.right:
+                raise ValueError("DAG division must be exact with a nonzero divisor")
+            expected = operation.left // operation.right
+        if expected <= 0 or expected > value_limit:
+            raise ValueError("DAG operation result is outside the positive value limit")
+        if operation.result != expected:
+            raise ValueError(
+                f"DAG result mismatch: {operation.left} {operation.operator} "
+                f"{operation.right} != {operation.result}"
+            )
+
         left_slots = locations.get(operation.left)
         right_slots = locations.get(operation.right)
         if not left_slots or not right_slots:
