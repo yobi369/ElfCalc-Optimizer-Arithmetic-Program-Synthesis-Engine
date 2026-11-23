@@ -37,6 +37,8 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         for candidate in recipes:
             expected = set()
             for target in missing:
+                if target == candidate:
+                    continue  # The candidate's own target status is scored separately.
                 for other in available:
                     for left, right in ((candidate, other), (other, candidate)):
                         if any(
