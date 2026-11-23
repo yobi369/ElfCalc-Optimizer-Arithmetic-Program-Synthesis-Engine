@@ -71,13 +71,13 @@ jobs:
           slugs=(
             "atakanaldemir/santa-2026-joint-recipes-for-large-puzzles"
             "pablodiegoo/santa-2026-deterministic-atlas-solver"
-            "avazaku/elf-calc-shared-helpers-chain-resynthesis"
+            "avazaku/elf-calc-backward-frontier-rewrite"
             "royalacecat/elf-calculator-residual-cut-search"
             "prvsiyan/santa-2026-elf-calculator"
             "romanrozen/santa-2026-elf-calculator"
             "mizeroluckygall/elf-calculator-best-of-public-merge-polish"
             "alexchilton/rudolph-the-red-nosed-register-allocator"
-            "avazaku/elf-calc-shared-helpers-chain-resynthesis"
+            "avazaku/elf-calc-backward-frontier-rewrite"
             "ozertuu/santa-2026-starter-notebook"
           )
           : > bundle/pull-status.txt
