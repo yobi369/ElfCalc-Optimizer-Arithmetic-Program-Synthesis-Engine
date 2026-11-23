@@ -1,6 +1,6 @@
 import unittest
 
-from elfcalc.shared_intermediate import plan_shared_intermediates
+from elfcalc.shared_intermediate import (\n    _apply,\n    _candidate_target_yields,\n    _pair_recipes,\n    plan_shared_intermediates,\n)
 
 
 class SharedIntermediatePlannerTests(unittest.TestCase):
@@ -17,6 +17,30 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         self.assertEqual(plan.missing_targets, ())
         self.assertEqual(plan.intermediate_count, 1)
         self.assertEqual(plan.instruction_count, 3)
+
+    def test_inverse_target_cones_match_brute_force_relations(self):
+        available = (2, 3, 4, 6, 8, 12)
+        limit = 100
+        recipes = {
+            recipe.result: recipe
+            for recipe in _pair_recipes(available, limit)
+            if recipe.result not in available
+        }
+        missing = frozenset(range(1, 31))
+        indexed = _candidate_target_yields(recipes, available, missing, limit)
+
+        for candidate in recipes:
+            expected = set()
+            for target in missing:
+                for other in available:
+                    for left, right in ((candidate, other), (other, candidate)):
+                        if any(
+                            _apply(left, operator, right, limit) == target
+                            for operator in ("+", "-", "*", "/")
+                        ):
+                            expected.add(target)
+            actual = {relation.result for relation in indexed.get(candidate, ())}
+            self.assertEqual(actual, expected, candidate)
 
     def test_rejects_target_above_value_limit(self):
         with self.assertRaises(ValueError):
