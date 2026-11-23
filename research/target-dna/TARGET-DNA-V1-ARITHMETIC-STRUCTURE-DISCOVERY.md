@@ -222,3 +222,5 @@ This replaces the earlier deeply nested inverse search with a bridge-index join.
 
 **Scope:** this is a two-intermediate fallback, not general beam search or arbitrary-depth synthesis. It expands the planner's reach but does not establish a full-dataset score improvement. Full scored-puzzle benchmarking remains a separate required gate.
 
+The two-intermediate path is now also covered end-to-end through `solve_shared_intermediate`: the abstract chain is lowered by the liveness-aware register scheduler and independently replayed by the VM validator. The expanded suite passes **70 tests** on Python 3.10, 3.11, and 3.12.
+
