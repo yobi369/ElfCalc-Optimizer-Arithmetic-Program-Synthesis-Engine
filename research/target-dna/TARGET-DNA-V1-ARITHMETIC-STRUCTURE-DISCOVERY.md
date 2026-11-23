@@ -181,3 +181,18 @@ The test suite now includes inverse-cone equivalence, incremental-frontier equiv
 
 **Evidence boundary:** these tests establish implementation correctness on their covered cases. They do not establish a reduction in the 130,974-instruction full-dataset incumbent. A full 1,000-puzzle run and exact score comparison remain required before promotion. The shared-intermediate planner is not yet a verified score improvement.
 
+## Register-pressure-aware lowering — 23 November 2026
+
+The register scheduler now performs a deterministic topological reordering before assigning physical registers. At each step it considers only operations whose operands are available, then prefers the operation that:
+
+1. Leaves the fewest values with outstanding future uses;
+2. Releases the greatest number of last-use operands;
+3. Prefers a target-producing operation when the live-value cost is tied;
+4. Uses stable result and original-position tie-breaks.
+
+The ordering pass rejects cycles, unresolved dependencies, and duplicate produced values. The existing allocator then assigns one of the 48 physical registers, reusing a dead source register only after its final use, and independently replays the emitted instructions through the local arithmetic VM.
+
+Regression coverage includes two interleaved dependency chains where the original topological order retains unnecessary live intermediates, a true two-node dependency cycle, missing dependencies, malformed arithmetic, and full VM replay. CI passed all 67 tests on Python 3.10, 3.11, and 3.12.
+
+This improves the lowering layer's ability to fit a valid DAG into the register bank. It does not change the DAG's arithmetic instruction count and has not yet been shown to reduce the full competition score. The next research step is to make DAG selection itself aware of liveness, so candidate intermediates are priced by both target yield and the register pressure they create.
+
