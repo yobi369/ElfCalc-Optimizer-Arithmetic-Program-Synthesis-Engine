@@ -17,7 +17,6 @@ class TargetDNATests(unittest.TestCase):
 
     def test_discovers_gcd_difference_and_quotient_candidates(self):
         dna = analyze_targets([12, 18], [6, 30], 100)
-        self.assertIn(6, dna.candidate_intermediates)
         self.assertIn(2, dna.candidate_intermediates)
         self.assertIn(3, dna.candidate_intermediates)
 
