@@ -168,3 +168,16 @@ A Target DNA candidate may replace the incumbent only after:
 5. documented per-puzzle changes.
 
 The 130,974 incumbent remains protected. The 100,000-instruction objective is aspirational, not a promised outcome. No Kaggle submission is made without explicit user approval.
+
+## Implementation update — 23 November 2026
+
+The first shared-intermediate planner now has three concrete engineering layers:
+
+1. **Inverse target cones:** invert each missing target against the current value frontier to identify candidate intermediates that can unlock it. The inverse equations are regression-tested against brute-force exact arithmetic.
+2. **Incremental recipe frontier:** seed the reachable pair-recipe table once, then add only pairs that involve newly available values. This avoids rebuilding all old-old pairs after every greedy selection. A regression test compares the incremental table with a complete rebuild on a fixed frontier.
+3. **Register-aware lowering and replay:** lower the selected value DAG into the 48-register VM using last-use liveness, reject malformed DAG arithmetic before allocation, and replay the emitted instructions.
+
+The test suite now includes inverse-cone equivalence, incremental-frontier equivalence, register-liveness behavior, malformed-DAG rejection, and end-to-end VM replay. The latest CI run passed on Python 3.10, 3.11, and 3.12.
+
+**Evidence boundary:** these tests establish implementation correctness on their covered cases. They do not establish a reduction in the 130,974-instruction full-dataset incumbent. A full 1,000-puzzle run and exact score comparison remain required before promotion. The shared-intermediate planner is not yet a verified score improvement.
+
