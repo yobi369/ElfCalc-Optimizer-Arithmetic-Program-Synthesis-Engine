@@ -26,6 +26,40 @@ class RegisterScheduleTests(unittest.TestCase):
         self.assertEqual(len(program), 2)
         self.assertEqual(program[0].destination, 0)
 
+    def test_reorders_ready_operations_to_reduce_live_intermediates(self):
+        class Operation:
+            def __init__(self, left, operator, right, result, is_target=False):
+                self.left = left
+                self.operator = operator
+                self.right = right
+                self.result = result
+                self.is_target = is_target
+
+        # Deliberately interleave two dependency chains: A, C, B, D, final.
+        operations = (
+            Operation(2, "+", 3, 5),
+            Operation(7, "+", 11, 18),
+            Operation(5, "*", 2, 10),
+            Operation(18, "*", 7, 126),
+            Operation(10, "+", 126, 136, True),
+        )
+        program = schedule_value_dag(operations, (2, 3, 7, 11), 200)
+        self.assertEqual((program[0].left, program[0].right), (0, 1))
+        self.assertEqual({program[1].left, program[1].right}, {0, 4})
+        puzzle = Puzzle("liveness_reorder", (2, 3, 7, 11), (136,), 200)
+        result = validate_program(puzzle, program)
+        self.assertTrue(result.complete, result.error)
+
+    def test_rejects_cyclic_value_dag(self):
+        class Operation:
+            left = 5
+            operator = "+"
+            right = 2
+            result = 7
+
+        with self.assertRaisesRegex(ValueError, "cycle"):
+            schedule_value_dag((Operation(),), (2, 3), 20)
+
     def test_rejects_dag_with_incorrect_declared_result(self):
         class Operation:
             left = 2
