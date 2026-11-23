@@ -181,7 +181,14 @@ def plan_shared_intermediates(
         yields = _candidate_target_yields(
             recipes_by_result, frontier, frozenset(missing), value_limit
         )
-        for candidate, recipe in recipes_by_result.items():
+        # Only candidates with immediate target value or a nonzero inverse
+        # target cone can improve coverage. Avoid scanning the entire pairwise
+        # recipe table when most generated values are irrelevant this round.
+        relevant_candidates = sorted(
+            set(yields).union(missing.intersection(recipes_by_result))
+        )
+        for candidate in relevant_candidates:
+            recipe = recipes_by_result[candidate]
             immediate = candidate in missing
             unlocked = tuple(
                 relation for relation in yields.get(candidate, ())
