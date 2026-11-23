@@ -4,6 +4,8 @@ from elfcalc.shared_intermediate import (
     _apply,
     _candidate_target_yields,
     _pair_recipes,
+    _pair_recipes_for_pair,
+    _recipe_order,
     plan_shared_intermediates,
 )
 
@@ -48,6 +50,27 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
                             expected.add(target)
             actual = {relation.result for relation in indexed.get(candidate, ())}
             self.assertEqual(actual, expected, candidate)
+
+    def test_incremental_pair_frontier_matches_full_rebuild(self):
+        values = (2, 3, 4, 6, 8, 12)
+        limit = 100
+        full = {}
+        for recipe in _pair_recipes(values, limit):
+            if recipe.result not in values:
+                previous = full.get(recipe.result)
+                if previous is None or _recipe_order(recipe) < _recipe_order(previous):
+                    full[recipe.result] = recipe
+
+        incremental = {}
+        for index, value in enumerate(values):
+            for other in values[:index + 1]:
+                for recipe in _pair_recipes_for_pair(value, other, limit):
+                    if recipe.result in values:
+                        continue
+                    previous = incremental.get(recipe.result)
+                    if previous is None or _recipe_order(recipe) < _recipe_order(previous):
+                        incremental[recipe.result] = recipe
+        self.assertEqual(incremental, full)
 
     def test_rejects_target_above_value_limit(self):
         with self.assertRaises(ValueError):
