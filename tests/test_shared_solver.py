@@ -18,7 +18,7 @@ class SharedIntermediateSolverTests(unittest.TestCase):
         self.assertEqual(solve_shared_intermediate(puzzle), ())
 
     def test_rejects_uncovered_target_set(self):
-        puzzle = Puzzle("shared_solver_incomplete", (4, 8), (3, 5), 20)
+        puzzle = Puzzle("shared_solver_incomplete", (2,), (10**18,), 10**18)
         with self.assertRaisesRegex(ValueError, "missed"):
             solve_shared_intermediate(puzzle)
 
