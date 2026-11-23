@@ -206,3 +206,19 @@ All other one-step recipes have zero immediate target yield and cannot win the c
 
 The planner is still greedy and one-step. This optimization reduces ranking work; it does not establish a full-dataset instruction reduction.
 
+## Two-intermediate target-cone completion — 23 November 2026
+
+The planner now has a bounded fallback for cases where no currently reachable one-step intermediate can unlock a missing target. It searches for a chain:
+
+`available values → first intermediate → bridge intermediate → missing target`
+
+The search is performed backward from missing targets:
+- Build a map of bridge values that can combine with an available anchor to produce a missing target.
+- Join those bridge values against one-operation results formed by a candidate first intermediate and an available anchor.
+- Rank valid chains by the number of targets sharing the same bridge, then apply deterministic tie-breaks.
+- Add the first and bridge intermediates only when the remaining intermediate budget permits both; then append the unlocked target operations and incrementally extend the recipe frontier.
+
+This replaces the earlier deeply nested inverse search with a bridge-index join. The test fixture `starts=(2, 3), target=(16)` now produces the verified value chain `4 → 8 → 16`. A separate test confirms that a one-intermediate budget does not partially commit an incomplete chain. The shared solver also retains a bounded-depth failure test. CI passed all 69 tests on Python 3.10, 3.11, and 3.12.
+
+**Scope:** this is a two-intermediate fallback, not general beam search or arbitrary-depth synthesis. It expands the planner's reach but does not establish a full-dataset score improvement. Full scored-puzzle benchmarking remains a separate required gate.
+
