@@ -15,8 +15,6 @@ from .machine import ArithmeticMachine, Instruction, MachineError, REGISTER_COUN
 def _reorder_for_liveness(operations: Sequence[object], starting_values: Sequence[int]) -> tuple[object, ...]:
     """Topologically reorder ready DAG nodes to reduce simultaneously live values."""
     pending = list(enumerate(operations))
-    operations = _reorder_for_liveness(operations, starting_values)
-
     remaining = Counter()
     for operation in operations:
         remaining[operation.left] += 1
@@ -58,6 +56,8 @@ def schedule_value_dag(operations: Sequence[object], starting_values: Sequence[i
         raise ValueError("starting_values must fit the machine register bank")
     if type(value_limit) is not int or value_limit <= 0:
         raise ValueError("value_limit must be a positive integer")
+
+    operations = _reorder_for_liveness(operations, starting_values)
 
     remaining = Counter()
     for operation in operations:
