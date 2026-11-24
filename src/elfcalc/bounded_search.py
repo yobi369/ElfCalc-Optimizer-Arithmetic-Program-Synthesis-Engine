@@ -647,6 +647,8 @@ def plan_bounded_beam(
         starts, initial.missing, value_limit,
         max_intermediates=min(max_intermediates, max_depth),
     ):
+        if len(operations) > max_depth:
+            continue
         try:
             schedule_value_dag(operations, starts, value_limit)
             peak = estimate_peak_live_values(operations, starts)
