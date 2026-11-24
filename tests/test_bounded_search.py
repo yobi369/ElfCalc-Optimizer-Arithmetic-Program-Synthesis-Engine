@@ -264,6 +264,31 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         for witness in witnesses:
             self.assertTrue(schedule_value_dag(witness, [2, 3], 1000))
 
+    def test_partial_motif_finds_useful_subset_when_complete_witness_is_impossible(self):
+        starts = (2, 3)
+        goals = frozenset({12, 18, 99})
+        complete = _shared_subgraph_witnesses(
+            starts, goals, 1000,
+            max_intermediates=1,
+            max_recipes_per_state=128,
+            max_states=4096,
+            max_witnesses=64,
+        )
+        partial = _partial_subgraph_motifs(
+            starts, goals, 1000,
+            max_intermediates=1,
+            max_recipes_per_state=128,
+            max_states=4096,
+            max_candidates=64,
+        )
+        self.assertEqual(complete, ())
+        self.assertTrue(partial)
+        operations, covered = partial[0]
+        self.assertEqual(covered, frozenset({12, 18}))
+        self.assertEqual(len(operations), 3)
+        self.assertEqual(operations[0].result, 6)
+        self.assertTrue(schedule_value_dag(operations, starts, 1000))
+
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
