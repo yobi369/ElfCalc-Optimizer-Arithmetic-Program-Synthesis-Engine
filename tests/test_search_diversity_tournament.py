@@ -114,11 +114,25 @@ class SearchDiversityTournamentTests(TestCase):
 
         self.assertEqual(selected, (leader, alternative))
         surviving = selected[1]
-        self.assertIn(40, {
-            recipe.result for recipe in search._cached_pair_recipes(
+        next_recipe = next(
+            recipe for recipe in search._cached_pair_recipes(
                 tuple(sorted(surviving.available)), 100
             )
-        })
+            if recipe.result == 40
+        )
+        completion = PlannedOperation(
+            next_recipe.left, next_recipe.operator,
+            next_recipe.right, next_recipe.result, True,
+        )
+        winning_operations = surviving.operations + (completion,)
+        allocation = schedule_value_dag(winning_operations, starts, 100)
+        replay = validate_program(
+            Puzzle("reserved_branch_completion", starts, (40,), 100),
+            allocation,
+        )
+        self.assertTrue(replay.complete, replay.error)
+        self.assertEqual(len(allocation), 2)
+        self.assertEqual(search._direct_yield(leader, 100), 0)
 
     def test_six_configuration_tournament_across_synthetic_families(self):
         rows = []
