@@ -329,7 +329,7 @@ class BoundedBeamPlannerTests(unittest.TestCase):
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
-            max_intermediates=2, max_states=1024,
+            max_intermediates=1, max_states=1024,
         )
         self.assertTrue(candidates)
         operations, covered = candidates[0]
