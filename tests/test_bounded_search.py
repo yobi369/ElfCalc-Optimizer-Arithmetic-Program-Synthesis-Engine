@@ -1,4 +1,5 @@
 import unittest
+from time import perf_counter
 
 from elfcalc.bounded_search import (
     _backward_target_cone,
@@ -139,26 +140,31 @@ class BoundedBeamPlannerTests(unittest.TestCase):
             motif_recipe_budget=16,
             motif_result_budget=16,
         )
-        modes = {
-            "beam_only": plan_bounded_beam(
-                [2, 3], [12, 18, 99], 1000,
-                enable_complete_witnesses=False,
-                enable_partial_motifs=False,
-                **common,
-            ),
-            "complete_witness": plan_bounded_beam(
-                [2, 3], [12, 18, 99], 1000,
-                enable_complete_witnesses=True,
-                enable_partial_motifs=False,
-                **common,
-            ),
-            "partial_motif": plan_bounded_beam(
-                [2, 3], [12, 18, 99], 1000,
-                enable_complete_witnesses=False,
-                enable_partial_motifs=True,
-                **common,
-            ),
-        }
+        modes = {}
+        elapsed_seconds = {}
+
+        def run_mode(name, **flags):
+            started = perf_counter()
+            modes[name] = plan_bounded_beam(
+                [2, 3], [12, 18, 99], 1000, **flags, **common
+            )
+            elapsed_seconds[name] = perf_counter() - started
+
+        run_mode(
+            "beam_only",
+            enable_complete_witnesses=False,
+            enable_partial_motifs=False,
+        )
+        run_mode(
+            "complete_witness",
+            enable_complete_witnesses=True,
+            enable_partial_motifs=False,
+        )
+        run_mode(
+            "partial_motif",
+            enable_complete_witnesses=False,
+            enable_partial_motifs=True,
+        )
         metrics = {}
         for name, plan in modes.items():
             allocation = schedule_value_dag(plan.operations, [2, 3], 1000)
@@ -174,6 +180,10 @@ class BoundedBeamPlannerTests(unittest.TestCase):
             }
             self.assertLessEqual(metrics[name]["instructions"], common["max_depth"])
         self.assertEqual(set(metrics), {"beam_only", "complete_witness", "partial_motif"})
+        print("SYNTHETIC_STRATEGY_METRICS", {
+            name: {**metrics[name], "elapsed_seconds": elapsed_seconds[name]}
+            for name in sorted(metrics)
+        })
         self.assertGreaterEqual(
             len(modes["partial_motif"].covered_targets),
             2,
