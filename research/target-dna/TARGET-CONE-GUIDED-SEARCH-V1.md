@@ -129,3 +129,9 @@ The controlled comparison now covers two fixtures, all three strategies, and Pyt
 Wall-clock observations for Fixture B varied by CI interpreter/runner: approximately 1.14–2.59 seconds per strategy. Complete-witness was marginally faster than partial-motif in these three runs, but the difference is too small and environment-sensitive to support a speed claim. The meaningful result is coverage: the motif searches recover the second target that beam-only misses under these declared limits.
 
 **Interpretation:** complete-witness and partial-motif both help on this deliberately constructed shared-bridge case. Partial-motif search has not yet demonstrated an advantage over complete-witness search on this fixture. The next experiment should target partial motifs that unlock useful subsets when no bounded complete witness exists, and compare several structurally distinct synthetic families. These results are synthetic only; they do not establish improvement on the Kaggle puzzle set or justify production integration.
+
+### Search-state provenance correction
+
+A further static review found that the complete-witness DFS keyed visited states only by available values and prefix length. That could merge two different arithmetic derivations that reached the same value frontier at the same depth, potentially discarding a distinct valid witness before register-pressure evaluation. The key now includes a canonicalized operation-provenance signature. Partial-motif state signatures are also canonicalized so equivalent operation sets reached in different expansion orders do not consume duplicate state budget.
+
+A regression fixture confirms that both `2+2=4` and `2*2=4` derivations survive when each can participate in a valid `4+6=10` witness. All returned witnesses are scheduled and replayed. CI passed all 98 tests on Python 3.10, 3.11, and 3.12. This preserves alternative provenance; it does not claim globally optimal witness enumeration.
