@@ -165,8 +165,8 @@ def _rank(
     ) if subgraph_support else 0
     return (
         len(state.missing),
-        -_direct_yield(state, limit),
         -shared_potential,
+        -_direct_yield(state, limit),
         len(state.operations),
         _peak(state, starts),
         state.intermediates,
