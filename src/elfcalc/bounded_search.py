@@ -30,14 +30,24 @@ class _State:
 
 def _state_key(
     state: _State, starts: tuple[int, ...]
-) -> tuple[tuple[int, ...], tuple[int, ...], int, int, int]:
-    """Deduplicate equivalent frontiers without erasing cost/pressure trade-offs."""
+) -> tuple:
+    """Deduplicate equivalent DAGs without erasing structural diversity.
+
+    Equal value frontiers are not necessarily equivalent: different recipes
+    can expose different future arithmetic relationships and scheduling
+    opportunities. Canonical operation provenance keeps those alternatives
+    alive; beam width and Pareto filtering remain the resource controls.
+    """
+    provenance = tuple(sorted(
+        (op.result, op.operator, op.left, op.right) for op in state.operations
+    ))
     return (
         tuple(sorted(state.missing)),
         tuple(sorted(state.available)),
         len(state.operations),
         _peak(state, starts),
         state.intermediates,
+        provenance,
     )
 
 
