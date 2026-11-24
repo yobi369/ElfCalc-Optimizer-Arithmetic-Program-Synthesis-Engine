@@ -76,3 +76,18 @@ No new full-dataset score is claimed. No Kaggle submission has been made. The fr
 The bounded beam now computes a deterministic, capped look-ahead over two-intermediate DAG fragments from the actual starting frontier. It scores a first intermediate by the number of missing targets that become directly reachable after a legal second intermediate. This is separate from the reverse-cone signal: it explicitly preserves the relationship between the first node, a second bridge node, and the jointly exposed targets.
 
 Synthetic fixture: starts 2 and 3 produce 5, then 7; the pair 5 and 7 produces both 12 and 35. Tests assert the support attribution and require the beam's completed plan to pass the register scheduler and VM replay. The helper is capped at 128 first recipes and 256 second recipes per first recipe. It remains a heuristic and is not integrated into the production solver or evaluated on the scored archive.
+
+## Witness-guided shared-subgraph proposals
+
+The experimental planner now has a bounded witness-construction path in addition to its beam-ranking heuristics. For each bounded first recipe, it enumerates a capped second-recipe frontier, then checks whether the two intermediates jointly expose every currently missing target. A successful witness stores the actual PlannedOperation sequence, including operand dependencies, rather than only a score or candidate-value signal.
+
+Every witness is passed through schedule_value_dag, which performs register allocation and local VM replay before it can be returned. The path is bounded by 128 first recipes and 256 second recipes per first recipe, and is eligible only when the caller's intermediate and depth budgets permit two intermediates plus the target-producing operations. It remains experimental; it is not integrated into the production solver and has not been evaluated against the scored competition archive.
+
+Synthetic witness:
+- Starts: 2, 3
+- Intermediates: 5 (= 2 + 3), 7 (= 5 + 2)
+- Targets: 12 (= 5 + 7), 35 (= 5 * 7)
+- Four total instructions; exact scheduler/VM replay required.
+
+CI run for commit d81e64a562eff3ee07106a7a309cca6c4e832f47 passed on Python 3.10, 3.11, and 3.12:
+https://github.com/yobi369/ElfCalc-Optimizer-Arithmetic-Program-Synthesis-Engine/actions/runs/45343171796
