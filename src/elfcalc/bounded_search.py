@@ -7,6 +7,7 @@ proposal only; callers must schedule and replay it with the VM validator.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from fractions import Fraction
 from typing import Iterable
 
@@ -18,6 +19,12 @@ from .shared_intermediate import (
     _recipe_order,
     _inverse_target_candidates,
 )
+
+
+@lru_cache(maxsize=256)
+def _cached_cached_pair_recipes(values: tuple[int, ...], limit: int):
+    """Reuse exact one-step arithmetic frontiers across equivalent states."""
+    return tuple(_cached_pair_recipes(values, limit))
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,7 +62,7 @@ def _direct_yield(state: _State, limit: int) -> int:
     """Count distinct missing targets reachable in one legal next operation."""
     reachable = set()
     values = tuple(sorted(state.available))
-    for recipe in _pair_recipes(values, limit):
+    for recipe in _cached_pair_recipes(values, limit):
         if recipe.result in state.missing:
             reachable.add(recipe.result)
     return len(reachable)
@@ -75,7 +82,7 @@ def _forward_anchor_pool(
     for _ in range(depth):
         additions: set[int] = set()
         ordered = tuple(sorted(known))
-        for recipe in _pair_recipes(ordered, limit):
+        for recipe in _cached_pair_recipes(ordered, limit):
             if recipe.result not in known:
                 additions.add(recipe.result)
                 if len(known) + len(additions) >= cap:
@@ -178,7 +185,7 @@ def _shared_completion_yield(
     available = tuple(sorted(state.available.union((candidate,))))
     return len({
         recipe.result
-        for recipe in _pair_recipes(available, limit)
+        for recipe in _cached_pair_recipes(available, limit)
         if recipe.result in state.missing and recipe.result in supported_goals
     })
 
@@ -253,14 +260,14 @@ def _shared_subgraph_support(
     """
     support: dict[int, set[int]] = {}
     first_recipes = [
-        recipe for recipe in _pair_recipes(tuple(sorted(set(starts))), limit)
+        recipe for recipe in _cached_pair_recipes(tuple(sorted(set(starts))), limit)
         if recipe.result not in starts and recipe.result not in goals
     ]
     first_recipes.sort(key=_recipe_order)
     for first in first_recipes[:max_first_recipes]:
         second_frontier = tuple(sorted(set(starts).union((first.result,))))
         second_recipes = [
-            recipe for recipe in _pair_recipes(second_frontier, limit)
+            recipe for recipe in _cached_pair_recipes(second_frontier, limit)
             if recipe.result not in second_frontier and recipe.result not in goals
         ]
         second_recipes.sort(key=_recipe_order)
@@ -268,7 +275,7 @@ def _shared_subgraph_support(
         bridge_values: set[int] = set()
         for second in second_recipes[:max_second_recipes_per_first]:
             available = tuple(sorted(set(second_frontier).union((second.result,))))
-            for target_recipe in _pair_recipes(available, limit):
+            for target_recipe in _cached_pair_recipes(available, limit):
                 if target_recipe.result in goals:
                     unlocked.add(target_recipe.result)
                     bridge_values.add(second.result)
@@ -324,7 +331,7 @@ def _shared_subgraph_witnesses(
         expanded_states += 1
 
         target_recipes = [
-            recipe for recipe in _pair_recipes(tuple(sorted(available)), limit)
+            recipe for recipe in _cached_pair_recipes(tuple(sorted(available)), limit)
             if recipe.result in goals
         ]
         by_target = {}
@@ -347,7 +354,7 @@ def _shared_subgraph_witnesses(
             continue
 
         recipes = [
-            recipe for recipe in _pair_recipes(tuple(sorted(available)), limit)
+            recipe for recipe in _cached_pair_recipes(tuple(sorted(available)), limit)
             if recipe.result not in available and recipe.result not in goals
         ]
         recipes.sort(key=_recipe_order)
@@ -403,7 +410,7 @@ def _partial_subgraph_motifs(
         expanded += 1
 
         by_target = {}
-        for recipe in _pair_recipes(tuple(sorted(available)), limit):
+        for recipe in _cached_pair_recipes(tuple(sorted(available)), limit):
             if recipe.result in goals:
                 by_target.setdefault(recipe.result, recipe)
         covered = frozenset(by_target)
@@ -420,7 +427,7 @@ def _partial_subgraph_motifs(
         if len(prefix) >= max_intermediates:
             continue
         recipes = [
-            recipe for recipe in _pair_recipes(tuple(sorted(available)), limit)
+            recipe for recipe in _cached_pair_recipes(tuple(sorted(available)), limit)
             if recipe.result not in available and recipe.result not in goals
         ]
         recipes.sort(key=_recipe_order)
@@ -557,7 +564,7 @@ def plan_bounded_beam(
     for first in subgraph_support:
         frontier = tuple(sorted(set(starts).union((first,))))
         subgraph_bridge_values.update(
-            recipe.result for recipe in _pair_recipes(frontier, value_limit)
+            recipe.result for recipe in _cached_pair_recipes(frontier, value_limit)
             if recipe.result not in frontier and recipe.result not in initial.missing
         )
     target_cone = frozenset(
@@ -573,7 +580,7 @@ def plan_bounded_beam(
                     state.operations, frozenset(goals), (), frozenset(starts)
                 )
             recipes = [
-                recipe for recipe in _pair_recipes(tuple(sorted(state.available)), value_limit)
+                recipe for recipe in _cached_pair_recipes(tuple(sorted(state.available)), value_limit)
                 if recipe.result not in state.available and recipe.result in target_cone
             ]
             # A capped reverse cone can miss a useful branch. Retain a small,
@@ -581,7 +588,7 @@ def plan_bounded_beam(
             # the entire state.
             if not recipes:
                 fallback = [
-                    recipe for recipe in _pair_recipes(tuple(sorted(state.available)), value_limit)
+                    recipe for recipe in _cached_pair_recipes(tuple(sorted(state.available)), value_limit)
                     if recipe.result not in state.available
                 ]
                 fallback.sort(key=lambda recipe: (
