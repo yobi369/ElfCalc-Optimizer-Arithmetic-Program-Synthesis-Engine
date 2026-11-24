@@ -26,9 +26,10 @@ Only positive integral candidates within the puzzle value limit are retained. Th
 2. Bound the pool to 512 distinct values and the closure depth to the configured beam depth.
 3. Starting from uncovered targets, repeatedly invert target equations against every anchor in the pool.
 4. Bound the accumulated reverse cone to 4,096 values.
-5. During beam expansion, prefer only legal recipes whose result lies in the reverse cone.
-6. If a capped cone produces no legal expansion for a state, retain a deterministic escape hatch of up to 16 ordinary frontier recipes, ranked by immediate target yield.
-7. Completed proposals still pass through the production register scheduler and exact VM replay before being returned.
+5. Preserve per-target cone provenance instead of flattening all goals into one union. Values occurring in several target cones are recognized as shared-intermediate candidates.
+6. During beam expansion, prefer legal recipes whose result lies in the reverse cone; use the number of supported goals as an additional deterministic ranking signal.
+7. If a capped cone produces no legal expansion for a state, retain a deterministic escape hatch of up to 16 ordinary frontier recipes, ranked by immediate target yield.
+8. Completed proposals still pass through the production register scheduler and exact VM replay before being returned.
 
 ## Why this is not a completeness claim
 
@@ -40,6 +41,8 @@ Unit fixtures cover:
 
 - the existing three-intermediate power chain \(2\to4\to16\to256\to65536\);
 - reverse-cone inclusion of the chain's intermediate values;
+- per-target support attribution and a shared value (6) that unlocks both targets 12 and 18;
+- an end-to-end beam fixture that finds the single shared intermediate and VM-replays both targets;
 - inversion coverage for addition, both subtraction orientations, multiplication, and exact division with either the unknown dividend or divisor;
 - deterministic output and enforcement of the cone cap;
 - beam determinism, intermediate budgets, invalid value limits, and initial-target handling;
@@ -50,6 +53,10 @@ https://github.com/yobi369/ElfCalc-Optimizer-Arithmetic-Program-Synthesis-Engine
 
 The cap adjustment and expanded target-cone fixtures have separate CI runs in progress:
 https://github.com/yobi369/ElfCalc-Optimizer-Arithmetic-Program-Synthesis-Engine/actions/runs/45340829360
+
+## Multi-target cone extension
+
+The beam now builds a separate bounded reverse cone for each missing target and retains a mapping from each candidate value to the targets supported by that value. Shared values receive a stronger ranking signal. The synthetic fixture uses starting values 2 and 3: the intermediate 6 unlocks both 12 and 18 in one operation each. This explicitly tests multi-target leverage rather than only checking that an intermediate belongs to a union of cones.
 
 ## Next research gates
 
