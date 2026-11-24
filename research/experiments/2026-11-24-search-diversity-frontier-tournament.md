@@ -181,22 +181,58 @@ and were not consistently monotonic with capacity, so no runtime-speedup claim
 is made. The principal demonstrated benefit is reduced repeated frontier
 generation with invariant plan quality.
 
+## Cache replacement-policy tournament
+
+CI run 45360112421 passed on Python 3.10, 3.11, and 3.12. It compared LRU,
+FIFO, and LFU at capacities 64, 128, and 256 across the three higher-branching
+fixtures. All 27 configurations produced identical plan-quality tuples within
+each fixture and passed exact VM validation.
+
+Actual frontier generations:
+
+| Fixture | Capacity | LRU | FIFO | LFU |
+|---|---:|---:|---:|---:|
+| overlapping_target_cones | 64 | 523 | 534 | 748 |
+| overlapping_target_cones | 128 | 476 | 489 | 624 |
+| overlapping_target_cones | 256 | 428 | 431 | 433 |
+| multi_route_shared_values | 64 | 411 | 420 | 549 |
+| multi_route_shared_values | 128 | 329 | 344 | 366 |
+| multi_route_shared_values | 256 | 314 | 314 | 314 |
+| dense_factorial_branching | 64 | 550 | 556 | 828 |
+| dense_factorial_branching | 128 | 507 | 518 | 665 |
+| dense_factorial_branching | 256 | 435 | 438 | 456 |
+
+LRU generated the fewest or tied for fewest frontiers in all nine comparisons.
+FIFO was close, with a small generation penalty in most cases. LFU was
+consistently worse, especially at smaller capacities; a plausible explanation
+is that one-off high-frequency entries can remain resident while recently
+reused working-set entries are evicted. This explanation is a hypothesis, not
+a separately proven mechanism.
+
+Runner timing agrees directionally that LFU has extra overhead, but absolute
+elapsed times varied across Python versions and jobs. Do not infer a reliable
+wall-clock speedup from this single CI matrix. The stronger result is that LRU
+minimizes recomputation in these fixtures without changing output quality.
+
+**Decision:** retain LRU as the cache replacement policy. No evidence justifies
+the added complexity of LFU or replacing LRU with FIFO.
+
 ## Decision and next experiment
 
 Keep ordinary beam admission as the default; diversity and adaptive
 reservation remain experimental because no natural synthetic quality gain has
-been demonstrated. Retain the existing 256-entry cache as a sensible
-synthetic working-set compromise, but do not claim it is competition-optimal
-or tune the production solver solely from these fixtures.
+been demonstrated. Retain the 256-entry LRU cache as a sensible synthetic
+working-set compromise, but do not claim it is competition-optimal or tune the
+production solver solely from these fixtures.
 
-The next experiment should broaden the synthetic fixture bank toward larger
-DAGs and repeated-frontier patterns, especially cases with overlapping target
-cones, high arithmetic branching, and multiple independent routes to shared
-intermediates. Compare cache capacities around the observed elbow (64, 128,
-256, 512) under fixed declared search limits. Measure generation counts,
-hits/misses/evictions, quality, and repeated wall-clock samples on a stable
-machine if available. Do not integrate new beam heuristics or change production
-settings until evidence is repeatable.
+The next experiment should test whether a scan-resistant two-queue policy
+(2Q: probationary FIFO for first-seen frontiers, protected LRU for reused
+frontiers) can outperform plain LRU on workloads with a mixture of one-off
+frontiers and repeated shared-value frontiers. Compare 2Q with LRU/FIFO at
+capacities 64, 128, and 256, with identical deterministic search limits and
+exact replay. Include adversarial scan pollution to test whether one-off
+frontiers displace repeatedly reused recipes. Do not integrate a new policy
+unless generation counts improve repeatably without changing quality.
 
 The competition archive remains uninspected in this research phase. The
 130,974-instruction incumbent remains frozen, and no Kaggle submission has
