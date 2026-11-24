@@ -213,9 +213,9 @@ def plan_bounded_beam(
     # Reverse target equations are joined only against a bounded forward
     # closure from the initial registers. This gives the beam a target-directed
     # candidate filter without making the search complete or unbounded.
-    anchor_pool = _forward_anchor_pool(starts, value_limit, max_depth, 2048)
+    anchor_pool = _forward_anchor_pool(starts, value_limit, max_depth, 512)
     target_cone = _backward_target_cone(
-        initial.missing, anchor_pool, value_limit, max_depth, 8192
+        initial.missing, anchor_pool, value_limit, max_depth, 4096
     )
     seen = {_state_key(initial, starts)}
 
