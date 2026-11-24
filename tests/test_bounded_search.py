@@ -139,6 +139,14 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         self.assertEqual(operations[0].result, 6)
         self.assertTrue(schedule_value_dag(operations, [2, 3], 1000))
 
+    def test_partial_motif_respects_total_instruction_depth(self):
+        plan = plan_bounded_beam(
+            [2, 3], [12, 18, 99], 1000,
+            max_intermediates=1, max_depth=2, beam_width=64,
+        )
+        self.assertLessEqual(len(plan.operations), 2)
+        self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
+
     def test_planner_returns_best_partial_motif_when_goals_remain(self):
         plan = plan_bounded_beam(
             [2, 3], [12, 18, 99], 1000,
