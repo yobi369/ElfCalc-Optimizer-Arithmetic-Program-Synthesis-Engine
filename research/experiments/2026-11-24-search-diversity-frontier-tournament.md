@@ -24,10 +24,11 @@ Four synthetic families are included: shared-factor subset coverage, two-stage
 shared bridge, multiple target families with direct and shared yields, and a
 provenance collision where distinct recipes produce the same value frontier.
 
-Every result is passed through register scheduling and independently validated against a synthetic puzzle containing exactly the covered targets. The scheduler also performs its own local VM replay.
-Metrics include target coverage, instruction count, peak live values, frontier
-requests, candidate-state proposals, actual frontier generations, and elapsed
-time.
+Every result is passed through register scheduling and independently validated
+against a synthetic puzzle containing exactly the covered targets. The
+scheduler also performs its own local VM replay. Metrics include target
+coverage, instruction count, peak live values, frontier requests,
+candidate-state proposals, actual frontier generations, and elapsed time.
 
 ## Budget and measurement caveats
 
@@ -102,23 +103,6 @@ preserve a branch with a valid multi-step completion that ordinary top-k
 selection discards, but that constructed mechanism has not translated into
 better output on these naturally ranked planner fixtures.
 
-## Decision and next experiment
-
-Do not promote diversity reservation into the production solver on this
-evidence. Keep it experimental. The next useful test is an adaptive selector:
-reserve a distinct-root slot only when the current top-ranked beam is
-structurally concentrated and the candidate alternative has demonstrable
-multi-step target support. Compare ordinary, always-diverse, and adaptive
-admission under the same declared budget on a broader deterministic synthetic
-fixture bank. Measure coverage, instruction count, peak-live pressure, state
-proposals, frontier generations, and runtime. The adaptive policy must show
-a repeatable quality gain before it is considered for production.
-
-This remains synthetic-only research. The competition archive has not been
-re-inspected, the frozen 130,974-instruction incumbent is unchanged, and no
-Kaggle submission has been made.
-
-
 ## Adaptive admission ablation
 
 The adaptive selector begins with ordinary global-rank admission. It intervenes
@@ -146,9 +130,9 @@ recommended default absent stronger evidence.
 
 ## Corrected cache economics observations
 
-The corrected tournament's CI log also shows that the 256-entry LRU frontier
-cache substantially reduces actual recipe-frontier generation while
-preserving quality. Selected examples:
+The corrected tournament's CI log shows that the 256-entry LRU frontier cache
+substantially reduces actual recipe-frontier generation while preserving
+quality. Selected examples:
 
 | Family / strategy | Cache off: generations | Cache on: generations | Reduction |
 |---|---:|---:|---:|
@@ -161,20 +145,58 @@ preserving quality. Selected examples:
 These are synthetic fixture counts, not competition-scale measurements.
 Wall-clock improvements are smaller and runner-dependent; the evidence
 supports caching as a reduction in repeated frontier construction, not a claim
-of equivalent end-to-end speedup. Cache hits, misses, and evictions were not
-yet recorded as a full memory/working-set profile.
+of equivalent end-to-end speedup.
 
-## Next experiment: cache working-set economics
+## Cache working-set capacity sweep
 
-Hold the search policy fixed and compare cache capacities 0 (disabled), 32,
-64, 128, 256, 512, and 1,024 on a larger deterministic synthetic fixture
-bank. Record cache hit/miss/current-size statistics, actual frontier
-generations, elapsed time, and peak memory if a reliable measurement is
-available. Repeat fixtures in a fixed order and reverse order to expose order
-sensitivity. Every capacity must produce identical plan-quality metrics and
-exact VM replay. The aim is to identify the smallest cache that captures most
-reusable work without unnecessary memory retention. No production change
-until the measured working-set curve justifies it.
+The follow-up sweep compared capacities 0 (disabled), 32, 64, 128, 256, 512,
+and 1,024 across four fixtures in forward and reverse fixture order (56 planner
+runs). CI run 45356337448 passed on Python 3.10, 3.11, and 3.12; Python 3.11
+reported 112 passing tests. Every capacity produced the same per-fixture
+coverage, instruction count, peak-live estimate, and missing-target set, and
+every returned plan passed register scheduling and exact VM validation.
+Forward/reverse order produced identical capacity-zero quality baselines.
+
+Representative generation counts from the forward-order run:
+
+| Fixture | Capacity 0 | 32 | 64 | 128 | 256 | 512 | 1,024 |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| shared_factor | 478 | 70 | 67 | 67 | 67 | 67 | 67 |
+| shared_bridge | 1,057 | 134 | 128 | 127 | 127 | 127 | 127 |
+| multi_family | 5,622 | 1,362 | 1,180 | 1,090 | 969 | 954 | 954 |
+| provenance_collision | 2,122 | 332 | 310 | 255 | 255 | 255 | 255 |
+
+The capacity curve has a clear elbow. A 64-entry cache captures almost all
+reuse in shared_factor; 128 captures the observed working set in shared_bridge
+and provenance_collision; multi_family benefits through 256, with only a
+small further reduction at 512 and none at 1,024. Capacity 256 is therefore a
+reasonable compromise for these synthetic workloads: it captures most of the
+measured reuse without retaining the larger 512/1,024-entry working sets.
+This is a synthetic recommendation, not proof of the optimal competition
+capacity.
+
+Cache hits, misses, current size, and inferred evictions were recorded. The
+test does not directly measure memory bytes. Wall-clock times varied little
+and were not consistently monotonic with capacity, so no runtime-speedup claim
+is made. The principal demonstrated benefit is reduced repeated frontier
+generation with invariant plan quality.
+
+## Decision and next experiment
+
+Keep ordinary beam admission as the default; diversity and adaptive
+reservation remain experimental because no natural synthetic quality gain has
+been demonstrated. Retain the existing 256-entry cache as a sensible
+synthetic working-set compromise, but do not claim it is competition-optimal
+or tune the production solver solely from these fixtures.
+
+The next experiment should broaden the synthetic fixture bank toward larger
+DAGs and repeated-frontier patterns, especially cases with overlapping target
+cones, high arithmetic branching, and multiple independent routes to shared
+intermediates. Compare cache capacities around the observed elbow (64, 128,
+256, 512) under fixed declared search limits. Measure generation counts,
+hits/misses/evictions, quality, and repeated wall-clock samples on a stable
+machine if available. Do not integrate new beam heuristics or change production
+settings until evidence is repeatable.
 
 The competition archive remains uninspected in this research phase. The
 130,974-instruction incumbent remains frozen, and no Kaggle submission has
