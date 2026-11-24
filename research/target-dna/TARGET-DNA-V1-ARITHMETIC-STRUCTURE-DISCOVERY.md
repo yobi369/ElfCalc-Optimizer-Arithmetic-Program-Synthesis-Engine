@@ -224,3 +224,20 @@ This replaces the earlier deeply nested inverse search with a bridge-index join.
 
 The two-intermediate path is now also covered end-to-end through `solve_shared_intermediate`: the abstract chain is lowered by the liveness-aware register scheduler and independently replayed by the VM validator. The expanded suite passes **70 tests** on Python 3.10, 3.11, and 3.12.
 
+
+
+## Cooperating-intermediate synthesis — 24 November 2026
+
+The planner now has a second two-intermediate fallback for a structure that is different from a serial chain:
+
+`available values → intermediate A`
+`available values → intermediate B`
+`intermediate A +/−/×/÷ intermediate B → missing target`
+
+Both intermediate recipes must be independently reachable from the current frontier. The implementation in `_best_cooperating_intermediates` inverts each missing-target equation against candidate recipe results, then joins only pairs for which both sides have valid frontier recipes. It does not enumerate an unrestricted Cartesian product of all recipe pairs.
+
+A regression fixture uses starts `(2, 5)` and target `26`: `2 / 2 = 1`, `5 × 5 = 25`, and `1 + 25 = 26`. A second test verifies that a budget of one intermediate does not partially commit the pair. The existing serial-chain fallback remains preferred when it finds a valid chain; the cooperating fallback is used when that search finds none.
+
+CI passed on Python 3.10, 3.11, and 3.12 for the cooperating-intermediate implementation and its new tests.
+
+**Evidence boundary:** this adds another bounded DAG shape to the planner. It does not establish a full-dataset score improvement, and it does not prove global optimality. The 130,974 incumbent remains protected pending full exact replay and provenance review.
