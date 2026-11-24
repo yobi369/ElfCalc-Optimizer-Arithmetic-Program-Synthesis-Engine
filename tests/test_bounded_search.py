@@ -27,6 +27,27 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         cone = _backward_target_cone(frozenset({65536}), anchors, 100000, 4, 4096)
         self.assertTrue({2, 4, 16, 256, 65536}.issubset(cone))
 
+    def test_reverse_cone_inverts_all_arithmetic_directions(self):
+        # t=20 with anchor 5 admits x+5, x-5, x*5, and x/5.
+        cone = _backward_target_cone(
+            frozenset({20}), (5,), 1000, 1, 128
+        )
+        self.assertTrue({15, 25, 4, 100}.issubset(cone))
+
+        # t=5 with anchor 25 admits 25-x=5 and 25/x=5.
+        reverse = _backward_target_cone(
+            frozenset({5}), (25,), 1000, 1, 128
+        )
+        self.assertIn(20, reverse)
+
+        # Exact division in both orientations: 21/3=7 and 21/3=7
+        # when solving the unknown divisor.
+        quotient = _backward_target_cone(
+            frozenset({7}), (3, 21), 1000, 1, 128
+        )
+        self.assertIn(21, quotient)
+        self.assertIn(3, quotient)
+
     def test_reverse_cone_is_bounded_and_deterministic(self):
         anchors = _forward_anchor_pool((2, 3), 1000, 3, 128)
         first = _backward_target_cone(frozenset({72}), anchors, 1000, 3, 256)
