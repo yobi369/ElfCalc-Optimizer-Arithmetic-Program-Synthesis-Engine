@@ -235,6 +235,27 @@ def _best_cooperating_intermediates(
     return None if best is None else best[1:]
 
 
+def _pareto_frontier(items, metrics):
+    """Return deterministic non-dominated items for minimization metrics.
+
+    Each metric tuple is minimized componentwise. An item is dominated only
+    when another is no worse on every dimension and strictly better on at
+    least one; incomparable cost/pressure/coverage trade-offs are preserved.
+    """
+    scored = [(metrics(item), index, item) for index, item in enumerate(items)]
+    frontier = []
+    for metric, index, item in scored:
+        dominated = any(
+            other_metric != metric
+            and all(left <= right for left, right in zip(other_metric, metric))
+            and any(left < right for left, right in zip(other_metric, metric))
+            for other_metric, _, _ in scored
+        )
+        if not dominated:
+            frontier.append((index, item))
+    return tuple(item for _, item in sorted(frontier, key=lambda entry: entry[0]))
+
+
 def _extend_recipe_frontier(
     recipes_by_result: dict[int, ArithmeticRelation],
     available: set[int],
@@ -371,11 +392,11 @@ def plan_shared_intermediates(
                 alternatives.append(cooperating)
             if not alternatives:
                 break
-            # Rank each two-intermediate fragment by target yield per
-            # instruction, then by peak live values. Both alternatives spend
-            # two intermediate instructions, but their target fan-out and
-            # dependency shape can differ substantially.
-            def alternative_rank(candidate):
+            # Preserve the Pareto frontier across instruction cost,
+            # estimated peak liveness, and target yield. A scalar score can
+            # discard a structurally different option too early; only after
+            # dominance filtering do we apply deterministic preference.
+            def alternative_metrics(candidate):
                 first, second, targets = candidate
                 fragment = [
                     PlannedOperation(
@@ -391,19 +412,31 @@ def plan_shared_intermediates(
                     )
                     for recipe in targets
                 )
-                instruction_cost = len(fragment)
-                peak_live = estimate_peak_live_values(fragment, frontier)
                 return (
-                    Fraction(len(targets), instruction_cost),
-                    len(targets),
+                    len(fragment),
+                    estimate_peak_live_values(fragment, frontier),
+                    -len(targets),
+                )
+
+            pareto_alternatives = _pareto_frontier(
+                alternatives, alternative_metrics
+            )
+
+            def alternative_rank(candidate):
+                first, second, targets = candidate
+                instruction_cost, peak_live, negative_yield = alternative_metrics(candidate)
+                return (
+                    Fraction(-negative_yield, instruction_cost),
+                    -negative_yield,
                     -peak_live,
                     -instruction_cost,
                     -first.result,
                     -second.result,
                     tuple(_recipe_order(recipe) for recipe in targets),
                 )
+
             first_recipe, bridge_recipe, target_recipes = max(
-                alternatives, key=alternative_rank
+                pareto_alternatives, key=alternative_rank
             )
             intermediate_recipes = (first_recipe, bridge_recipe)
 
