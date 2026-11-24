@@ -40,6 +40,7 @@ Unit fixtures cover:
 
 - the existing three-intermediate power chain \(2\to4\to16\to256\to65536\);
 - reverse-cone inclusion of the chain's intermediate values;
+- inversion coverage for addition, both subtraction orientations, multiplication, and exact division with either the unknown dividend or divisor;
 - deterministic output and enforcement of the cone cap;
 - beam determinism, intermediate budgets, invalid value limits, and initial-target handling;
 - exact scheduler/VM replay for completed proposals.
