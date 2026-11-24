@@ -91,3 +91,9 @@ Synthetic witness:
 
 CI run for commit d81e64a562eff3ee07106a7a309cca6c4e832f47 passed on Python 3.10, 3.11, and 3.12:
 https://github.com/yobi369/ElfCalc-Optimizer-Arithmetic-Program-Synthesis-Engine/actions/runs/45343171796
+
+## Alternative witness selection
+
+The witness path now retains a bounded set of concrete two-intermediate proposals (up to 64) instead of returning the first schedulable proposal. Each candidate must pass register scheduling and local VM replay. Verified proposals are ranked by instruction count, estimated peak live values, and a deterministic structural tie-break. This creates an explicit cost-versus-register-pressure selection point while preserving reproducibility. The witness enumeration remains capped at 128 first recipes and 256 second recipes per first recipe; reaching the witness cap stops enumeration, so this is not an exhaustive search or global optimum proof.
+
+A regression test checks that the 2,3 -> 5,7 -> 12,35 witness is concrete, deterministic, and accepted by the scheduler/VM replay.
