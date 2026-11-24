@@ -449,6 +449,9 @@ def plan_bounded_beam(
     max_expansions_per_state: int = 512,
     enable_complete_witnesses: bool = True,
     enable_partial_motifs: bool = True,
+    motif_state_budget: int = 4096,
+    motif_recipe_budget: int = 128,
+    motif_result_budget: int = 64,
 ) -> SharedIntermediatePlan:
     """Search a bounded beam of partial arithmetic DAGs.
 
@@ -473,6 +476,9 @@ def plan_bounded_beam(
         ("max_expansions_per_state", max_expansions_per_state, 1),
         ("max_depth", max_depth, 0),
         ("max_intermediates", max_intermediates, 0),
+        ("motif_state_budget", motif_state_budget, 1),
+        ("motif_recipe_budget", motif_recipe_budget, 1),
+        ("motif_result_budget", motif_result_budget, 1),
     ):
         if type(value) is not int or value < minimum:
             raise ValueError(f"{name} must be an integer >= {minimum}")
@@ -508,6 +514,9 @@ def plan_bounded_beam(
         for witness in _shared_subgraph_witnesses(
             starts, initial.missing, value_limit,
             max_intermediates=witness_intermediate_budget,
+            max_recipes_per_state=motif_recipe_budget,
+            max_states=motif_state_budget,
+            max_witnesses=motif_result_budget,
         ):
             if len(witness) > max_depth:
                 continue
@@ -649,6 +658,9 @@ def plan_bounded_beam(
         _partial_subgraph_motifs(
             starts, initial.missing, value_limit,
             max_intermediates=min(max_intermediates, max_depth),
+            max_recipes_per_state=motif_recipe_budget,
+            max_states=motif_state_budget,
+            max_candidates=motif_result_budget,
         )
         if enable_partial_motifs else ()
     )
