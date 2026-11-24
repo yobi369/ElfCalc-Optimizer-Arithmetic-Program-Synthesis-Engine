@@ -217,22 +217,54 @@ minimizes recomputation in these fixtures without changing output quality.
 **Decision:** retain LRU as the cache replacement policy. No evidence justifies
 the added complexity of LFU or replacing LRU with FIFO.
 
-## Decision and next experiment
 
-Keep ordinary beam admission as the default; diversity and adaptive
-reservation remain experimental because no natural synthetic quality gain has
-been demonstrated. Retain the 256-entry LRU cache as a sensible synthetic
-working-set compromise, but do not claim it is competition-optimal or tune the
-production solver solely from these fixtures.
+## 2Q scan-resistant cache tournament
 
-The next experiment should test whether a scan-resistant two-queue policy
-(2Q: probationary FIFO for first-seen frontiers, protected LRU for reused
-frontiers) can outperform plain LRU on workloads with a mixture of one-off
-frontiers and repeated shared-value frontiers. Compare 2Q with LRU/FIFO at
-capacities 64, 128, and 256, with identical deterministic search limits and
-exact replay. Include adversarial scan pollution to test whether one-off
-frontiers displace repeatedly reused recipes. Do not integrate a new policy
-unless generation counts improve repeatably without changing quality.
+CI run 45362079641 passed on Python 3.10, 3.11, and 3.12. The corrected run
+reported 116 passing tests on each interpreter. It compared 2Q with LRU and
+FIFO at capacities 64, 128, and 256 on the three higher-branching fixtures.
+All configurations preserved identical plan-quality tuples within each
+fixture, and returned plans passed exact scheduling/VM validation. The
+adversarial scan-resistance test also passed: four repeatedly accessed hot
+entries were promoted and survived a 40-key one-pass scan.
+
+Actual frontier generations:
+
+| Fixture | Capacity | LRU | FIFO | 2Q |
+|---|---:|---:|---:|---:|
+| overlapping_target_cones | 64 | 523 | 534 | 963 |
+| overlapping_target_cones | 128 | 476 | 489 | 713 |
+| overlapping_target_cones | 256 | 428 | 431 | 438 |
+| multi_route_shared_values | 64 | 411 | 420 | 680 |
+| multi_route_shared_values | 128 | 329 | 344 | 413 |
+| multi_route_shared_values | 256 | 314 | 314 | 322 |
+| dense_factorial_branching | 64 | 550 | 556 | 988 |
+| dense_factorial_branching | 128 | 507 | 518 | 843 |
+| dense_factorial_branching | 256 | 435 | 438 | 460 |
+
+2Q generated more frontiers than LRU in all nine comparisons. At capacities
+64 and 128 the penalty was substantial; at 256 it was smaller but remained
+consistent. The scan-resistance micro-test demonstrates the policy's intended
+mechanism, but that mechanism did not translate into lower recomputation on
+these planner workloads. Timing was runner-dependent and is not used to claim
+a stable performance difference.
+
+**Decision:** retain the existing 256-entry LRU cache. Keep 2Q as a tested
+alternative only; do not integrate it into the planner. The cache-policy
+evidence now favors LRU over FIFO, LFU, and 2Q on the tested synthetic
+families, while none of these experiments establishes competition-scale
+optimality.
+
+## Updated decision and next direction
+
+The cache replacement-policy branch is complete for the current synthetic
+workloads. Avoid further cache-policy variants unless a new access-pattern
+hypothesis predicts a measurable benefit. The next research direction should
+move back toward arithmetic search quality rather than cache micro-optimization:
+design a controlled experiment that increases search diversity only when a
+target-cone or shared-subgraph signal predicts a concrete missing-target
+completion, then compare it against ordinary admission with exact replay.
+Keep it experimental until it improves more than adversarial hand-built cases.
 
 The competition archive remains uninspected in this research phase. The
 130,974-instruction incumbent remains frozen, and no Kaggle submission has
