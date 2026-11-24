@@ -11,6 +11,7 @@ from elfcalc.bounded_search import (
     _State,
     _cached_pair_recipes,
     _state_key,
+    _select_diverse_beam,
     plan_bounded_beam,
 )
 from elfcalc.register_schedule import estimate_peak_live_values, schedule_value_dag
@@ -18,6 +19,44 @@ from elfcalc.shared_intermediate import PlannedOperation
 
 
 class BoundedBeamPlannerTests(unittest.TestCase):
+    def test_beam_selection_reserves_distinct_first_recipe_families(self):
+        same_root_a = _State(
+            operations=(
+                PlannedOperation(2, "+", 2, 4, False),
+                PlannedOperation(2, "*", 3, 6, False),
+            ),
+            available=frozenset({2, 3, 4, 6}),
+            missing=frozenset({10}),
+            intermediates=2,
+        )
+        same_root_b = _State(
+            operations=(
+                PlannedOperation(2, "+", 2, 4, False),
+                PlannedOperation(3, "+", 3, 6, False),
+            ),
+            available=frozenset({2, 3, 4, 6}),
+            missing=frozenset({10}),
+            intermediates=2,
+        )
+        different_root = _State(
+            operations=(
+                PlannedOperation(2, "*", 2, 4, False),
+                PlannedOperation(2, "*", 3, 6, False),
+            ),
+            available=frozenset({2, 3, 4, 6}),
+            missing=frozenset({10}),
+            intermediates=2,
+        )
+        selected = _select_diverse_beam(
+            (same_root_a, same_root_b, different_root),
+            2, (2, 3), 1000,
+        )
+        roots = {
+            next(op.operator for op in state.operations if not op.is_target)
+            for state in selected
+        }
+        self.assertEqual(roots, {"+", "*"})
+
     def test_pair_recipe_frontier_cache_reuses_exact_results(self):
         _cached_pair_recipes.cache_clear()
         first = _cached_pair_recipes((2, 3, 5), 1000)
