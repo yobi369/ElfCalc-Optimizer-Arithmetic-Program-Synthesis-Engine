@@ -105,3 +105,9 @@ The concrete witness constructor has been generalized from exactly two intermedi
 Every returned witness is still passed through the register scheduler and exact local VM replay. Verified alternatives are ranked by instruction count, estimated peak live values, and deterministic structure. A regression fixture uses starts 2 and 3 to build 5, 25, and 125, then unlocks targets 250 and 375. A two-intermediate search is expected not to find that fixture; a three-intermediate search must.
 
 This expands the bounded motif horizon; it does not make the search complete, globally optimal, or suitable for production integration without further benchmarking.
+
+## Partial motif yield-density search
+
+Added `_partial_subgraph_motifs`, a bounded deterministic search that records a motif whenever its currently available values expose one or more missing targets, then continues expanding the DAG to see whether additional targets can be unlocked. It ranks proposals by exact target yield per emitted instruction (`covered_targets / instruction_count`), then absolute coverage, instruction count, and deterministic structure. Bounds are 128 recipes per state, 4,096 visited states, and 128 retained proposals by default. Every selected proposal is passed through register scheduling and local VM replay.
+
+The planner compares these partial proposals against its best incomplete beam state and can return a verified partial plan with explicit covered and missing target sets. A regression fixture uses starts 2 and 3: the intermediate 6 unlocks 12 and 18 in two additional operations, while 99 remains uncovered. This is an objective-aligned local heuristic, not a guarantee of globally optimal target coverage or instruction count. It remains experimental and is not wired into the production solver.
