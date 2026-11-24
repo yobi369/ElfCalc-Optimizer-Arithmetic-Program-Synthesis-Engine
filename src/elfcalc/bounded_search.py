@@ -279,6 +279,7 @@ def _shared_subgraph_witnesses(
     *,
     max_first_recipes: int = 128,
     max_second_recipes_per_first: int = 256,
+    max_witnesses: int = 64,
 ) -> tuple[tuple[PlannedOperation, ...], ...]:
     """Materialize bounded two-intermediate witnesses for joint target coverage.
 
@@ -325,10 +326,8 @@ def _shared_subgraph_witnesses(
                 for target in sorted(goals)
             )
             witnesses.append((first_op, second_op) + target_ops)
-    witnesses.sort(key=lambda ops: (
-        len(ops),
-        tuple((op.result, op.operator, op.left, op.right) for op in ops),
-    ))
+            if len(witnesses) >= max_witnesses:
+                return tuple(witnesses)
     return tuple(witnesses)
 
 
@@ -393,6 +392,7 @@ def plan_bounded_beam(
     # First attempt a concrete, bounded two-intermediate witness. This
     # avoids relying on beam ranking to rediscover a known valid subgraph.
     if initial.missing and max_intermediates >= 2 and max_depth >= 4:
+        verified_witnesses = []
         for witness in _shared_subgraph_witnesses(
             starts, initial.missing, value_limit
         ):
@@ -400,10 +400,17 @@ def plan_bounded_beam(
                 continue
             try:
                 schedule_value_dag(witness, starts, value_limit)
+                peak = estimate_peak_live_values(witness, starts)
             except (ValueError, RuntimeError):
                 continue
+            stable = tuple(
+                (op.result, op.operator, op.left, op.right) for op in witness
+            )
+            verified_witnesses.append((len(witness), peak, stable, witness))
+        if verified_witnesses:
+            _cost, _peak_live, _stable, winner = min(verified_witnesses)
             return SharedIntermediatePlan(
-                operations=witness,
+                operations=winner,
                 covered_targets=frozenset(goals),
                 missing_targets=(),
                 initial_values=frozenset(starts),
