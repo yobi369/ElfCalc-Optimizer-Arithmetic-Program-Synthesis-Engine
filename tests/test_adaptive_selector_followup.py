@@ -92,9 +92,13 @@ class AdaptiveSelectorFollowupTests(TestCase):
                 ),
             ) if motif_candidates else None
 
-            # If both probes found complete programs, compare them directly.
-            # Otherwise compare observed target yield per generated recipe,
-            # allowing a promising partial strategy to receive the remainder.
+            beam_score = (
+                len(beam_probe.covered_targets)
+                / max(1, beam_work["candidate_recipes"])
+            )
+            motif_score = (
+                motif_coverage / max(1, motif_work["candidate_recipes"])
+            )
             if beam_candidate is not None and best_motif is not None:
                 selected = min(
                     (("beam", beam_candidate), ("motif", best_motif)),
@@ -107,21 +111,13 @@ class AdaptiveSelectorFollowupTests(TestCase):
                 strategy, final_ops = selected
                 continuation_work = {"candidate_recipes": 0}
             else:
-                beam_score = (
-                    len(beam_probe.covered_targets)
-                    / max(1, beam_work["candidate_recipes"])
-                )
-                motif_score = (
-                    motif_coverage / max(1, motif_work["candidate_recipes"])
-                )
                 strategy = "motif" if motif_score > beam_score else "beam"
-
+                final_ops = ()
+                continuation_work = {"candidate_recipes": 0}
                 if strategy == "beam" and beam_candidate is not None:
                     final_ops = beam_candidate
-                    continuation_work = {"candidate_recipes": 0}
                 elif strategy == "motif" and best_motif is not None:
                     final_ops = best_motif
-                    continuation_work = {"candidate_recipes": 0}
                 elif strategy == "beam":
                     continuation, continuation_work = self._measure(
                         lambda: search.plan_bounded_beam(
@@ -160,6 +156,29 @@ class AdaptiveSelectorFollowupTests(TestCase):
                             len(ops), estimate_peak_live_values(ops, starts)
                         ),
                     ) if complete else ()
+                    # A motif continuation can exhaust its witness frontier
+                    # without a complete program. Fall back to beam rather
+                    # than failing the whole adaptive portfolio.
+                    if not final_ops:
+                        fallback, fallback_work = self._measure(
+                            lambda: search.plan_bounded_beam(
+                                starts, targets, limit,
+                                max_intermediates=intermediates, max_depth=depth,
+                                beam_width=8, max_expansions_per_state=RECIPE_BUDGET,
+                                max_total_state_expansions=STATE_BUDGET-PROBE_STATES,
+                                enable_complete_witnesses=False,
+                                enable_partial_motifs=False,
+                                enable_target_cone_guidance=False,
+                                enable_shared_subgraph_guidance=False,
+                            )
+                        )
+                        final_ops = fallback.operations
+                        continuation_work = {
+                            "candidate_recipes": (
+                                continuation_work["candidate_recipes"]
+                                + fallback_work["candidate_recipes"]
+                            )
+                        }
 
             replayed = self._replay(
                 name + "_adaptive_followup", starts, targets, limit, final_ops
