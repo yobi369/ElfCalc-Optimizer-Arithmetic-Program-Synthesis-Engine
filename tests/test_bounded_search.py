@@ -5,6 +5,7 @@ from elfcalc.bounded_search import (
     _forward_anchor_pool,
     _multi_target_cone_support,
     _shared_completion_yield,
+    _shared_subgraph_witnesses,
     _State,
     plan_bounded_beam,
 )
@@ -90,6 +91,19 @@ class BoundedBeamPlannerTests(unittest.TestCase):
             _shared_completion_yield(state, 7, 1000, support),
             2,
         )
+
+    def test_shared_subgraph_witnesses_are_concrete_and_deterministic(self):
+        args = ((2, 3), frozenset({12, 35}), 1000)
+        first = _shared_subgraph_witnesses(*args)
+        second = _shared_subgraph_witnesses(*args)
+        self.assertEqual(first, second)
+        self.assertTrue(first)
+        witness = first[0]
+        self.assertEqual(
+            tuple(operation.result for operation in witness),
+            (5, 7, 12, 35),
+        )
+        self.assertTrue(schedule_value_dag(witness, [2, 3], 1000))
 
     def test_beam_finds_two_node_shared_subgraph(self):
         plan = plan_bounded_beam(
