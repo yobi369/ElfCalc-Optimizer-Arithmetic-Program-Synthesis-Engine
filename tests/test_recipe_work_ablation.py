@@ -213,3 +213,84 @@ class RecipeWorkAblationTests(TestCase):
         for row in rows:
             print(row)
         self.assertEqual(len(rows), 2)
+
+
+    def test_best_of_beam_and_motif_portfolio_is_exactly_replayed(self):
+        rows = []
+        for name, starts, targets, limit, intermediates, depth in FIXTURES:
+            beam, beam_work = self._measure(lambda: search.plan_bounded_beam(
+                starts, targets, limit,
+                max_intermediates=intermediates,
+                max_depth=depth,
+                beam_width=8,
+                max_expansions_per_state=RECIPE_BUDGET,
+                max_total_state_expansions=STATE_BUDGET,
+                enable_complete_witnesses=False,
+                enable_partial_motifs=False,
+                enable_target_cone_guidance=False,
+                enable_shared_subgraph_guidance=False,
+            ))
+            candidates = [("beam", beam.operations, beam_work)]
+            witnesses, motif_work = self._measure(lambda: search._shared_subgraph_witnesses(
+                starts, frozenset(targets), limit,
+                max_intermediates=intermediates,
+                max_recipes_per_state=RECIPE_BUDGET,
+                max_states=STATE_BUDGET,
+                max_witnesses=64,
+            ))
+            for operations in witnesses:
+                if len(operations) > depth:
+                    continue
+                try:
+                    program = schedule_value_dag(operations, starts, limit)
+                except (ValueError, RuntimeError):
+                    continue
+                replay = validate_program(
+                    Puzzle(name + "_portfolio_motif", starts, targets, limit), program
+                )
+                if replay.complete:
+                    candidates.append(("motif", operations, motif_work))
+
+            valid = []
+            for strategy, operations, work in candidates:
+                try:
+                    program = schedule_value_dag(operations, starts, limit)
+                except (ValueError, RuntimeError):
+                    continue
+                replay = validate_program(
+                    Puzzle(name + "_portfolio_" + strategy, starts,
+                           tuple(sorted(set(targets).intersection(
+                               set(starts) | {op.result for op in operations}
+                           ))), limit),
+                    program,
+                )
+                if replay.complete:
+                    valid.append((strategy, operations, work))
+
+            winner = min(
+                valid,
+                key=lambda item: (
+                    len(item[1]),
+                    estimate_peak_live_values(item[1], starts),
+                    tuple((op.result, op.operator, op.left, op.right)
+                          for op in item[1]),
+                ),
+            ) if valid else None
+            rows.append({
+                "fixture": name,
+                "portfolio_complete": winner is not None,
+                "winner": winner[0] if winner else None,
+                "instructions": len(winner[1]) if winner else None,
+                "peak_live": estimate_peak_live_values(winner[1], starts) if winner else None,
+                "beam_candidate_recipes": beam_work["candidate_recipes"],
+                "motif_candidate_recipes": motif_work["candidate_recipes"],
+                "portfolio_candidate_recipes": (
+                    beam_work["candidate_recipes"] + motif_work["candidate_recipes"]
+                ),
+            })
+
+        print("BEST_OF_BEAM_MOTIF_PORTFOLIO")
+        for row in rows:
+            print(row)
+        self.assertEqual(len(rows), len(FIXTURES))
+        self.assertTrue(all(row["portfolio_complete"] for row in rows))
