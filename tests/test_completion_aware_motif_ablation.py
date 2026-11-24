@@ -92,6 +92,10 @@ class CompletionAwareMotifAblationTests(TestCase):
                 "motif_complete": motif is not None,
                 "motif_instructions": len(motif[3]) if motif else None,
                 "motif_peak_live": motif[1] if motif else None,
+                "motif_operations": tuple(
+                    (op.left, op.operator, op.right, op.result)
+                    for op in motif[3]
+                ) if motif else None,
                 "beam_seconds": round(beam_seconds, 6),
                 "motif_seconds": round(motif_seconds, 6),
             })
@@ -101,9 +105,13 @@ class CompletionAwareMotifAblationTests(TestCase):
             print(row)
         self.assertEqual(len(rows), len(FIXTURES))
         self.assertTrue(all(row["state_budget_each"] == STATE_BUDGET for row in rows))
-        # The deliberately constructed two-branch arithmetic family has a
-        # known 4-operation shared construction: 2*5=10, 3*5=15,
-        # 10*5=50, 15*5=75.
+        # The witness search discovers the tighter 3-operation shared
+        # construction: 5*5=25, 2*25=50, 3*25=75.
         first = rows[0]
         self.assertTrue(first["motif_complete"], first)
-        self.assertEqual(first["motif_instructions"], 4)
+        self.assertEqual(first["motif_instructions"], 3, first)
+        self.assertEqual(
+            {op[3] for op in first["motif_operations"]},
+            {25, 50, 75},
+            first,
+        )
