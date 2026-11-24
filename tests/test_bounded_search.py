@@ -105,6 +105,27 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         )
         self.assertTrue(schedule_value_dag(witness, [2, 3], 1000))
 
+    def test_bounded_witness_search_reaches_three_intermediate_motif(self):
+        from elfcalc.bounded_search import _shared_subgraph_witnesses
+
+        starts = (2, 3)
+        goals = frozenset({250, 375})
+        shallow = _shared_subgraph_witnesses(
+            starts, goals, 1000, max_intermediates=2
+        )
+        self.assertEqual(shallow, ())
+
+        plan = plan_bounded_beam(
+            starts, tuple(sorted(goals)), 1000,
+            max_intermediates=3, max_depth=5, beam_width=64,
+        )
+        self.assertEqual(plan.missing_targets, ())
+        self.assertLessEqual(plan.intermediate_count, 3)
+        self.assertTrue({250, 375}.issubset(
+            {operation.result for operation in plan.operations}
+        ))
+        self.assertTrue(schedule_value_dag(plan.operations, starts, 1000))
+
     def test_beam_finds_two_node_shared_subgraph(self):
         plan = plan_bounded_beam(
             [2, 3], [12, 35], 1000,
