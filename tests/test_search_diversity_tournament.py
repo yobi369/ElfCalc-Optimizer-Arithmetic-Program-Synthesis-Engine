@@ -16,6 +16,7 @@ import elfcalc.bounded_search as search
 from elfcalc.register_schedule import estimate_peak_live_values, schedule_value_dag
 from elfcalc.puzzle import Puzzle
 from elfcalc.validation import validate_program
+from elfcalc.shared_intermediate import PlannedOperation
 
 
 FIXTURES = (
@@ -52,6 +53,42 @@ def _ordinary_admission(states, beam_width, starts, limit, subgraph_support=None
 
 
 class SearchDiversityTournamentTests(TestCase):
+
+    def test_diversity_reserves_a_slot_for_a_lower_ranked_distinct_root(self):
+        starts = (2, 3, 4, 5)
+        missing = frozenset((11,))
+        available = frozenset((2, 3, 4, 5, 6, 8))
+        root_a = PlannedOperation(2, "+", 4, 6, False)
+        root_b = PlannedOperation(3, "+", 3, 6, False)
+        tail_a = PlannedOperation(3, "+", 5, 8, False)
+        tail_b = PlannedOperation(2, "*", 4, 8, False)
+        top_a = search._State((root_a, tail_a), available, missing, 2)
+        second_a = search._State((root_a, tail_b), available, missing, 2)
+        lower_ranked_b = search._State((root_b, tail_a), available, missing, 2)
+
+        # The ordinary rank ties these states; input order represents the
+        # deterministic tie-break. Two top slots would otherwise be spent on
+        # descendants of the same first recipe.
+        ranked = (top_a, second_a, lower_ranked_b)
+        with patch.object(search, "_rank", side_effect=lambda state, *_: (
+            0 if state is top_a else 1 if state is second_a else 2
+        )):
+            selected = search._select_diverse_beam(
+                ranked, 2, starts, 100
+            )
+
+        self.assertEqual(selected, (top_a, lower_ranked_b))
+        self.assertEqual(
+            (selected[0].operations[0].result, selected[0].operations[0].operator,
+             selected[0].operations[0].left, selected[0].operations[0].right),
+            (6, "+", 2, 4),
+        )
+        self.assertEqual(
+            (selected[1].operations[0].result, selected[1].operations[0].operator,
+             selected[1].operations[0].left, selected[1].operations[0].right),
+            (6, "+", 3, 3),
+        )
+
     def test_six_configuration_tournament_across_synthetic_families(self):
         rows = []
         configurations = (
