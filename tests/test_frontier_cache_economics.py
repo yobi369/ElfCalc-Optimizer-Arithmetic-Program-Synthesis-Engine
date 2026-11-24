@@ -97,6 +97,9 @@ class FrontierCacheEconomicsTests(TestCase):
                     }
                     rows.append(row)
 
+        for fixture in FIXTURES:
+            self.assertEqual(baseline[(fixture["name"], 0)], baseline[(fixture["name"], 1)])
+
         print("FRONTIER_CACHE_CAPACITY_SWEEP")
         for row in rows:
             print(row)
