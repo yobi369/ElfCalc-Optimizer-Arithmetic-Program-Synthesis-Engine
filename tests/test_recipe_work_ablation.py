@@ -258,10 +258,7 @@ class RecipeWorkAblationTests(TestCase):
                 except (ValueError, RuntimeError):
                     continue
                 replay = validate_program(
-                    Puzzle(name + "_portfolio_" + strategy, starts,
-                           tuple(sorted(set(targets).intersection(
-                               set(starts) | {op.result for op in operations}
-                           ))), limit),
+                    Puzzle(name + "_portfolio_" + strategy, starts, targets, limit),
                     program,
                 )
                 if replay.complete:
