@@ -432,8 +432,8 @@ def _partial_subgraph_motifs(
     ranked = sorted(
         unique.values(),
         key=lambda item: (
-            -Fraction(len(item[1]), max(1, len(item[0]))),
             -len(item[1]),
+            -Fraction(len(item[1]), max(1, len(item[0]))),
             len(item[0]),
             tuple((op.result, op.operator, op.left, op.right) for op in item[0]),
         ),
