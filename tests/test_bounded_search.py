@@ -9,6 +9,7 @@ from elfcalc.bounded_search import (
     _shared_subgraph_witnesses,
     _partial_subgraph_motifs,
     _State,
+    _cached_pair_recipes,
     _state_key,
     plan_bounded_beam,
 )
@@ -17,6 +18,16 @@ from elfcalc.shared_intermediate import PlannedOperation
 
 
 class BoundedBeamPlannerTests(unittest.TestCase):
+    def test_pair_recipe_frontier_cache_reuses_exact_results(self):
+        _cached_pair_recipes.cache_clear()
+        first = _cached_pair_recipes((2, 3, 5), 1000)
+        second = _cached_pair_recipes((2, 3, 5), 1000)
+        self.assertIs(first, second)
+        self.assertEqual(
+            {(r.left, r.operator, r.right, r.result) for r in first},
+            {(r.left, r.operator, r.right, r.result) for r in second},
+        )
+
     def test_state_key_preserves_distinct_recipe_provenance(self):
         left = _State(
             operations=(
