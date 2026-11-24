@@ -277,47 +277,46 @@ def _shared_subgraph_witnesses(
     goals: frozenset[int],
     limit: int,
     *,
-    max_first_recipes: int = 128,
-    max_second_recipes_per_first: int = 256,
+    max_intermediates: int = 2,
+    max_recipes_per_state: int = 128,
+    max_states: int = 4096,
     max_witnesses: int = 64,
 ) -> tuple[tuple[PlannedOperation, ...], ...]:
-    """Materialize bounded two-intermediate witnesses for joint target coverage.
+    """Materialize bounded multi-stage witnesses for joint target coverage.
 
-    Unlike a cone heuristic, each returned proposal contains the actual
-    dependency-bearing operations for both intermediates and every target
-    unlocked by their joint availability.
+    A deterministic depth-first frontier grows a value DAG by one non-target
+    intermediate at a time. At every node it checks whether the currently
+    available values jointly expose every goal in one final operation each.
+    Both branching and total visited states are capped. Returned proposals
+    contain their concrete dependencies and are still subject to scheduling
+    and exact VM replay by the caller.
     """
+    if max_intermediates < 0 or max_recipes_per_state < 1:
+        raise ValueError("invalid bounded witness-search limits")
+    start_set = frozenset(starts)
+    # Reverse-push sorted recipes so the lexicographically first recipe is
+    # explored first by the LIFO stack.
+    stack = [(start_set, ())]
+    visited = set()
     witnesses = []
-    start_set = set(starts)
-    first_recipes = [
-        recipe for recipe in _pair_recipes(tuple(sorted(start_set)), limit)
-        if recipe.result not in start_set and recipe.result not in goals
-    ]
-    first_recipes.sort(key=_recipe_order)
-    for first in first_recipes[:max_first_recipes]:
-        first_op = PlannedOperation(
-            first.left, first.operator, first.right, first.result, False
-        )
-        first_frontier = tuple(sorted(start_set.union((first.result,))))
-        second_recipes = [
-            recipe for recipe in _pair_recipes(first_frontier, limit)
-            if recipe.result not in first_frontier and recipe.result not in goals
+    expanded_states = 0
+
+    while stack and expanded_states < max_states:
+        available, prefix = stack.pop()
+        state_key = (tuple(sorted(available)), len(prefix))
+        if state_key in visited:
+            continue
+        visited.add(state_key)
+        expanded_states += 1
+
+        target_recipes = [
+            recipe for recipe in _pair_recipes(tuple(sorted(available)), limit)
+            if recipe.result in goals
         ]
-        second_recipes.sort(key=_recipe_order)
-        for second in second_recipes[:max_second_recipes_per_first]:
-            second_op = PlannedOperation(
-                second.left, second.operator, second.right, second.result, False
-            )
-            available = tuple(sorted(set(first_frontier).union((second.result,))))
-            target_recipes = [
-                recipe for recipe in _pair_recipes(available, limit)
-                if recipe.result in goals
-            ]
-            by_target = {}
-            for recipe in target_recipes:
-                by_target.setdefault(recipe.result, recipe)
-            if not goals.issubset(by_target):
-                continue
+        by_target = {}
+        for recipe in target_recipes:
+            by_target.setdefault(recipe.result, recipe)
+        if goals.issubset(by_target):
             target_ops = tuple(
                 PlannedOperation(
                     by_target[target].left, by_target[target].operator,
@@ -325,9 +324,29 @@ def _shared_subgraph_witnesses(
                 )
                 for target in sorted(goals)
             )
-            witnesses.append((first_op, second_op) + target_ops)
+            witnesses.append(prefix + target_ops)
             if len(witnesses) >= max_witnesses:
-                return tuple(witnesses)
+                break
+            continue
+
+        if len(prefix) >= max_intermediates:
+            continue
+
+        recipes = [
+            recipe for recipe in _pair_recipes(tuple(sorted(available)), limit)
+            if recipe.result not in available and recipe.result not in goals
+        ]
+        recipes.sort(key=_recipe_order)
+        for recipe in reversed(recipes[:max_recipes_per_state]):
+            operation = PlannedOperation(
+                recipe.left, recipe.operator, recipe.right, recipe.result, False
+            )
+            stack.append((available.union((recipe.result,)), prefix + (operation,)))
+
+    witnesses.sort(key=lambda ops: (
+        len(ops),
+        tuple((op.result, op.operator, op.left, op.right) for op in ops),
+    ))
     return tuple(witnesses)
 
 
@@ -391,10 +410,14 @@ def plan_bounded_beam(
     )
     # First attempt a concrete, bounded two-intermediate witness. This
     # avoids relying on beam ranking to rediscover a known valid subgraph.
-    if initial.missing and max_intermediates >= 2 and max_depth >= 4:
+    witness_intermediate_budget = min(
+        max_intermediates, max(0, max_depth - len(initial.missing))
+    )
+    if initial.missing and witness_intermediate_budget >= 2:
         verified_witnesses = []
         for witness in _shared_subgraph_witnesses(
-            starts, initial.missing, value_limit
+            starts, initial.missing, value_limit,
+            max_intermediates=witness_intermediate_budget,
         ):
             if len(witness) > max_depth:
                 continue
