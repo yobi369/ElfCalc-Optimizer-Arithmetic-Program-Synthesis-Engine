@@ -565,6 +565,7 @@ def plan_bounded_beam(
     max_depth: int = 4,
     beam_width: int = 32,
     max_expansions_per_state: int = 512,
+    max_total_state_expansions: int | None = None,
     enable_complete_witnesses: bool = True,
     enable_partial_motifs: bool = True,
     motif_state_budget: int = 4096,
@@ -602,6 +603,10 @@ def plan_bounded_beam(
     ):
         if type(value) is not int or value < minimum:
             raise ValueError(f"{name} must be an integer >= {minimum}")
+    if (max_total_state_expansions is not None
+            and (type(max_total_state_expansions) is not int
+                 or max_total_state_expansions < 1)):
+        raise ValueError("max_total_state_expansions must be None or an integer >= 1")
 
     initial = _State(
         operations=(),
@@ -684,10 +689,15 @@ def plan_bounded_beam(
         .union(subgraph_bridge_values)
     )
     seen = {_state_key(initial, starts)}
+    total_state_expansions = 0
 
     for _depth in range(max_depth):
         expanded: list[_State] = []
         for state in beam:
+            if (max_total_state_expansions is not None
+                    and total_state_expansions >= max_total_state_expansions):
+                break
+            total_state_expansions += 1
             if not state.missing:
                 return SharedIntermediatePlan(
                     state.operations, frozenset(goals), (), frozenset(starts)
@@ -771,6 +781,11 @@ def plan_bounded_beam(
         beam = _select_diverse_beam(
             frontier, beam_width, starts, value_limit, subgraph_support
         )
+        if (max_total_state_expansions is not None
+                and total_state_expansions >= max_total_state_expansions):
+            # The current generation is retained, but no further beam states
+            # may be expanded beyond the explicit global state budget.
+            pass
         if beam and _rank(beam[0], starts, value_limit, subgraph_support) < _rank(best, starts, value_limit, subgraph_support):
             best = beam[0]
         complete = [state for state in beam if not state.missing]
@@ -785,6 +800,9 @@ def plan_bounded_beam(
             return SharedIntermediatePlan(
                 winner.operations, frozenset(goals), (), frozenset(starts)
             )
+        if (max_total_state_expansions is not None
+                and total_state_expansions >= max_total_state_expansions):
+            break
 
     # Compare incomplete beam output against bounded partial motifs. Unlike
     # complete-witness search, these candidates optimize marginal target yield
