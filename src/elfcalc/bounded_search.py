@@ -15,6 +15,7 @@ from .shared_intermediate import (
     SharedIntermediatePlan,
     _pair_recipes,
     _recipe_order,
+    _inverse_target_candidates,
 )
 
 
@@ -51,6 +52,75 @@ def _direct_yield(state: _State, limit: int) -> int:
 
 def _peak(state: _State, starts: tuple[int, ...]) -> int:
     return estimate_peak_live_values(state.operations, starts)
+
+
+
+def _forward_anchor_pool(
+    starts: tuple[int, ...], limit: int, depth: int, cap: int
+) -> tuple[int, ...]:
+    """Build a deterministic, capped pool of values forward-reachable from starts."""
+    known = set(starts)
+    frontier = set(starts)
+    for _ in range(depth):
+        additions: set[int] = set()
+        ordered = tuple(sorted(known))
+        for recipe in _pair_recipes(ordered, limit):
+            if recipe.result not in known:
+                additions.add(recipe.result)
+                if len(known) + len(additions) >= cap:
+                    break
+        if not additions:
+            break
+        room = max(0, cap - len(known))
+        selected = set(sorted(additions)[:room])
+        if not selected:
+            break
+        known.update(selected)
+        frontier = selected
+    return tuple(sorted(known))
+
+
+def _backward_target_cone(
+    goals: frozenset[int],
+    anchors: tuple[int, ...],
+    limit: int,
+    depth: int,
+    cap: int,
+) -> frozenset[int]:
+    """Approximate exact reverse-reachable operands for the missing targets.
+
+    Inverse equations are evaluated against a bounded forward-reachable anchor
+    pool. This is a heuristic cone, not a completeness proof: the cap and depth
+    deliberately bound the work.
+    """
+    cone = set(goals)
+    frontier = set(goals)
+    for _ in range(depth):
+        additions: set[int] = set()
+        for target in sorted(frontier):
+            for anchor in anchors:
+                if anchor == target:
+                    continue
+                for candidate, _relation in _inverse_target_candidates(
+                    target, anchor, limit
+                ):
+                    if candidate not in cone:
+                        additions.add(candidate)
+                        if len(cone) + len(additions) >= cap:
+                            break
+                if len(cone) + len(additions) >= cap:
+                    break
+            if len(cone) + len(additions) >= cap:
+                break
+        if not additions:
+            break
+        room = max(0, cap - len(cone))
+        selected = set(sorted(additions)[:room])
+        if not selected:
+            break
+        cone.update(selected)
+        frontier = selected
+    return frozenset(cone)
 
 
 def _rank(state: _State, starts: tuple[int, ...], limit: int) -> tuple:
@@ -140,6 +210,13 @@ def plan_bounded_beam(
     )
     beam = (initial,)
     best = initial
+    # Reverse target equations are joined only against a bounded forward
+    # closure from the initial registers. This gives the beam a target-directed
+    # candidate filter without making the search complete or unbounded.
+    anchor_pool = _forward_anchor_pool(starts, value_limit, max_depth, 2048)
+    target_cone = _backward_target_cone(
+        initial.missing, anchor_pool, value_limit, max_depth, 8192
+    )
     seen = {_state_key(initial, starts)}
 
     for _depth in range(max_depth):
@@ -151,8 +228,26 @@ def plan_bounded_beam(
                 )
             recipes = [
                 recipe for recipe in _pair_recipes(tuple(sorted(state.available)), value_limit)
-                if recipe.result not in state.available
+                if recipe.result not in state.available and recipe.result in target_cone
             ]
+            # A capped reverse cone can miss a useful branch. Retain a small,
+            # deterministic direct-potential escape hatch rather than pruning
+            # the entire state.
+            if not recipes:
+                fallback = [
+                    recipe for recipe in _pair_recipes(tuple(sorted(state.available)), value_limit)
+                    if recipe.result not in state.available
+                ]
+                fallback.sort(key=lambda recipe: (
+                    -int(recipe.result in state.missing),
+                    -_direct_yield(
+                        _State(state.operations, state.available.union((recipe.result,)),
+                               state.missing.difference((recipe.result,)), state.intermediates),
+                        value_limit,
+                    ),
+                    _recipe_order(recipe),
+                ))
+                recipes = fallback[:16]
 
             # Prefer target-producing moves, then moves that expose more
             # missing targets immediately. Stable recipe order breaks ties.
