@@ -22,9 +22,9 @@ from .shared_intermediate import (
 
 
 @lru_cache(maxsize=256)
-def _cached_cached_pair_recipes(values: tuple[int, ...], limit: int):
+def _cached_pair_recipes(values: tuple[int, ...], limit: int):
     """Reuse exact one-step arithmetic frontiers across equivalent states."""
-    return tuple(_cached_pair_recipes(values, limit))
+    return tuple(_pair_recipes(values, limit))
 
 
 @dataclass(frozen=True, slots=True)
