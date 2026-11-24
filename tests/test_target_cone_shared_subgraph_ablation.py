@@ -91,15 +91,12 @@ class TargetConeSharedSubgraphAblationTests(TestCase):
                 allocation = schedule_value_dag(
                     plan.operations, fixture["starts"], fixture["limit"]
                 )
-                if covered:
-                    replay = validate_program(
-                        Puzzle(fixture["name"] + "_" + arm, fixture["starts"],
-                               covered, fixture["limit"]),
-                        allocation,
-                    )
-                    self.assertTrue(replay.complete, replay.error)
-                else:
-                    self.assertEqual(len(allocation), 0)
+                replay = validate_program(
+                    Puzzle(fixture["name"] + "_" + arm, fixture["starts"],
+                           covered, fixture["limit"]),
+                    allocation,
+                )
+                self.assertTrue(replay.complete, replay.error)
 
                 row = {
                     "fixture": fixture["name"],
