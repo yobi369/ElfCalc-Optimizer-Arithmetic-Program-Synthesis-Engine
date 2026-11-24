@@ -66,6 +66,27 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         self.assertIn(6, {op.result for op in plan.operations})
         self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
 
+    def test_two_node_shared_subgraph_supports_multiple_targets(self):
+        # 2+3=5, then 5+2=7; the pair 5 and 7 unlocks
+        # both 12 (5+7) and 35 (5*7).
+        from elfcalc.bounded_search import _shared_subgraph_support
+
+        support = _shared_subgraph_support(
+            (2, 3), frozenset({12, 35}), 1000
+        )
+        self.assertEqual(support[5], frozenset({12, 35}))
+
+    def test_beam_finds_two_node_shared_subgraph(self):
+        plan = plan_bounded_beam(
+            [2, 3], [12, 35], 1000,
+            max_intermediates=2, max_depth=4, beam_width=128,
+        )
+        self.assertEqual(plan.missing_targets, ())
+        self.assertEqual(plan.intermediate_count, 2)
+        results = {op.result for op in plan.operations}
+        self.assertTrue({5, 7, 12, 35}.issubset(results))
+        self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
+
     def test_multi_target_cone_is_deterministic(self):
         args = (frozenset({12, 18, 24}), (2, 3), 1000, 2, 128)
         self.assertEqual(
