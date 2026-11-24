@@ -216,9 +216,8 @@ def _select_diverse_beam(
             op for op in state.operations if not op.is_target
         ]
         if roots:
-            root = min(
-                (op.result, op.operator, op.left, op.right) for op in roots
-            )
+            first = roots[0]
+            root = (first.result, first.operator, first.left, first.right)
         else:
             root = ("direct", tuple(sorted(state.missing)))
         if root in seen_roots:
