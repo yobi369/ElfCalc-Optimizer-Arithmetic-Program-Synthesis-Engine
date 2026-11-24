@@ -127,6 +127,50 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         ))
         self.assertTrue(schedule_value_dag(plan.operations, starts, 1000))
 
+    def test_equal_parameter_budget_strategy_comparison(self):
+        # All modes share identical beam width, depth, intermediate budget,
+        # and per-state expansion cap. Only the optional motif layers differ.
+        common = dict(
+            max_intermediates=1,
+            max_depth=3,
+            beam_width=32,
+            max_expansions_per_state=64,
+        )
+        modes = {
+            "beam_only": plan_bounded_beam(
+                [2, 3], [12, 18, 99], 1000,
+                enable_complete_witnesses=False,
+                enable_partial_motifs=False,
+                **common,
+            ),
+            "complete_witness": plan_bounded_beam(
+                [2, 3], [12, 18, 99], 1000,
+                enable_complete_witnesses=True,
+                enable_partial_motifs=False,
+                **common,
+            ),
+            "partial_motif": plan_bounded_beam(
+                [2, 3], [12, 18, 99], 1000,
+                enable_complete_witnesses=False,
+                enable_partial_motifs=True,
+                **common,
+            ),
+        }
+        for plan in modes.values():
+            self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
+            self.assertEqual(
+                set(plan.covered_targets).union(plan.missing_targets),
+                {12, 18, 99},
+            )
+        self.assertGreaterEqual(
+            len(modes["partial_motif"].covered_targets),
+            2,
+        )
+        self.assertLessEqual(
+            len(modes["partial_motif"].operations),
+            common["max_depth"],
+        )
+
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
