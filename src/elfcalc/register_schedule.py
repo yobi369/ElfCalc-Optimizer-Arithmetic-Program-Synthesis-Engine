@@ -44,6 +44,34 @@ def _reorder_for_liveness(operations: Sequence[object], starting_values: Sequenc
         pending = [(index, op) for index, op in pending if index != chosen_index]
     return tuple(ordered)
 
+
+def estimate_peak_live_values(
+    operations: Sequence[object], starting_values: Sequence[int]
+) -> int:
+    """Estimate peak simultaneously-live value count under scheduler ordering.
+
+    A value is live at a scheduling boundary when at least one operation still
+    needs it as an operand. This is a DAG pressure estimate, not a physical
+    register-allocation proof; schedule_value_dag performs the real allocation
+    and VM replay.
+    """
+    ordered = _reorder_for_liveness(operations, starting_values)
+    remaining = Counter()
+    for operation in ordered:
+        remaining[operation.left] += 1
+        remaining[operation.right] += 1
+
+    available = set(starting_values)
+    peak = sum(1 for value in available if remaining[value] > 0)
+    for operation in ordered:
+        remaining[operation.left] -= 1
+        remaining[operation.right] -= 1
+        available.add(operation.result)
+        live = sum(1 for value in available if remaining[value] > 0)
+        peak = max(peak, live)
+    return peak
+
+
 def schedule_value_dag(operations: Sequence[object], starting_values: Sequence[int],
                        value_limit: int) -> tuple[Instruction, ...]:
     """Lower a topologically ordered value DAG into a 48-register program.
