@@ -50,6 +50,42 @@ class RegisterScheduleTests(unittest.TestCase):
         result = validate_program(puzzle, program)
         self.assertTrue(result.complete, result.error)
 
+
+    def test_peak_live_estimate_tracks_chain_pressure(self):
+        class Operation:
+            def __init__(self, left, operator, right, result, is_target=False):
+                self.left = left
+                self.operator = operator
+                self.right = right
+                self.result = result
+                self.is_target = is_target
+
+        from elfcalc.register_schedule import estimate_peak_live_values
+
+        operations = (
+            Operation(2, "+", 3, 5),
+            Operation(5, "*", 2, 10),
+            Operation(10, "+", 3, 13, True),
+        )
+        self.assertEqual(estimate_peak_live_values(operations, (2, 3)), 3)
+        # The same scheduler can lower and replay the DAG successfully.
+        program = schedule_value_dag(operations, (2, 3), 20)
+        puzzle = Puzzle("peak_live_chain", (2, 3), (13,), 20)
+        result = validate_program(puzzle, program)
+        self.assertTrue(result.complete, result.error)
+
+    def test_peak_live_estimator_rejects_missing_dependency(self):
+        from elfcalc.register_schedule import estimate_peak_live_values
+
+        class Operation:
+            left = 99
+            operator = "+"
+            right = 2
+            result = 101
+
+        with self.assertRaisesRegex(ValueError, "missing dependency"):
+            estimate_peak_live_values((Operation(),), (2, 3))
+
     def test_rejects_cyclic_value_dag(self):
         class Operation:
             def __init__(self, left, right, result):
