@@ -4,6 +4,8 @@ from elfcalc.bounded_search import (
     _backward_target_cone,
     _forward_anchor_pool,
     _multi_target_cone_support,
+    _shared_completion_yield,
+    _State,
     plan_bounded_beam,
 )
 from elfcalc.register_schedule import schedule_value_dag
@@ -75,6 +77,19 @@ class BoundedBeamPlannerTests(unittest.TestCase):
             (2, 3), frozenset({12, 35}), 1000
         )
         self.assertEqual(support[5], frozenset({12, 35}))
+
+    def test_bridge_node_scores_joint_shared_target_completion(self):
+        state = _State(
+            operations=(),
+            available=frozenset({2, 3, 5}),
+            missing=frozenset({12, 35}),
+            intermediates=1,
+        )
+        support = {5: frozenset({12, 35})}
+        self.assertEqual(
+            _shared_completion_yield(state, 7, 1000, support),
+            2,
+        )
 
     def test_beam_finds_two_node_shared_subgraph(self):
         plan = plan_bounded_beam(
