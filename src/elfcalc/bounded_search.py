@@ -236,6 +236,58 @@ def _select_diverse_beam(
     return tuple(selected)
 
 
+def _root_signature(state: _State) -> tuple:
+    """Identify the first non-target recipe that defines a state's branch."""
+    first = next((op for op in state.operations if not op.is_target), None)
+    if first is None:
+        return ("direct", tuple(sorted(state.missing)))
+    return (first.result, first.operator, first.left, first.right)
+
+
+def _select_adaptive_beam(
+    states: Iterable[_State],
+    beam_width: int,
+    starts: tuple[int, ...],
+    limit: int,
+    subgraph_support: dict[int, frozenset[int]] | None = None,
+) -> tuple[_State, ...]:
+    """Use diversity only when a concentrated beam hides a stronger target lead.
+
+    Start with ordinary global-rank admission. Intervene only when multiple
+    selected states share a first-recipe root and an excluded, structurally
+    distinct branch has strictly greater immediate target yield than the
+    weakest selected branch. Replace only the weakest selected state. This is
+    a conservative heuristic, not a completeness or optimality guarantee.
+    """
+    ranked = sorted(
+        states,
+        key=lambda state: _rank(state, starts, limit, subgraph_support),
+    )
+    selected = list(ranked[:beam_width])
+    if len(selected) < 2 or len({_root_signature(s) for s in selected}) == len(selected):
+        return tuple(selected)
+
+    selected_ids = {id(state) for state in selected}
+    selected_roots = {_root_signature(state) for state in selected}
+    weakest_yield = min(_direct_yield(state, limit) for state in selected)
+    alternatives = [
+        state for state in ranked
+        if id(state) not in selected_ids
+        and _root_signature(state) not in selected_roots
+        and _direct_yield(state, limit) > weakest_yield
+    ]
+    if not alternatives:
+        return tuple(selected)
+
+    replacement = alternatives[0]
+    weakest_index = max(
+        range(len(selected)),
+        key=lambda index: _rank(selected[index], starts, limit, subgraph_support),
+    )
+    selected[weakest_index] = replacement
+    return tuple(selected)
+
+
 def _rank(
     state: _State,
     starts: tuple[int, ...],
