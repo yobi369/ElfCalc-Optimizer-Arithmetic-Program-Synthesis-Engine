@@ -242,6 +242,28 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         self.assertEqual(metrics["complete_witness"]["instructions"], 4)
         self.assertEqual(metrics["partial_motif"]["instructions"], 4)
 
+    def test_witness_frontier_preserves_distinct_recipe_provenance(self):
+        # 4 can be produced as either 2+2 or 2*2. Both derivations can
+        # participate in a valid 4+6=10 witness and must not be collapsed
+        # merely because their available-value sets and prefix lengths match.
+        witnesses = _shared_subgraph_witnesses(
+            (2, 3), frozenset({10}), 1000,
+            max_intermediates=2,
+            max_recipes_per_state=128,
+            max_states=4096,
+            max_witnesses=64,
+        )
+        four_recipes = {
+            (op.operator, op.left, op.right)
+            for witness in witnesses
+            for op in witness
+            if op.result == 4
+        }
+        self.assertIn(("+", 2, 2), four_recipes)
+        self.assertIn(("*", 2, 2), four_recipes)
+        for witness in witnesses:
+            self.assertTrue(schedule_value_dag(witness, [2, 3], 1000))
+
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
