@@ -7,6 +7,7 @@ proposal only; callers must schedule and replay it with the VM validator.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
 from typing import Iterable
 
 from .register_schedule import estimate_peak_live_values, schedule_value_dag
@@ -350,6 +351,93 @@ def _shared_subgraph_witnesses(
     return tuple(witnesses)
 
 
+def _partial_subgraph_motifs(
+    starts: tuple[int, ...],
+    goals: frozenset[int],
+    limit: int,
+    *,
+    max_intermediates: int = 3,
+    max_recipes_per_state: int = 128,
+    max_states: int = 4096,
+    max_candidates: int = 128,
+) -> tuple[tuple[tuple[PlannedOperation, ...], frozenset[int]], ...]:
+    """Discover partial motifs ranked by target yield per instruction.
+
+    Unlike the complete-witness search, this records any prefix that exposes
+    at least one missing goal. It continues expanding that prefix because a
+    later intermediate may improve its joint target yield. The search is
+    deterministic and bounded; candidates are proposals until replayed.
+    """
+    if max_intermediates < 0 or min(
+        max_recipes_per_state, max_states, max_candidates
+    ) < 1:
+        raise ValueError("invalid partial motif search limits")
+    start_set = frozenset(starts)
+    stack = [(start_set, ())]
+    visited = set()
+    candidates = []
+    expanded = 0
+
+    while stack and expanded < max_states:
+        available, prefix = stack.pop()
+        signature = tuple(
+            (op.left, op.operator, op.right, op.result) for op in prefix
+        )
+        state_key = (tuple(sorted(available)), signature)
+        if state_key in visited:
+            continue
+        visited.add(state_key)
+        expanded += 1
+
+        by_target = {}
+        for recipe in _pair_recipes(tuple(sorted(available)), limit):
+            if recipe.result in goals:
+                by_target.setdefault(recipe.result, recipe)
+        covered = frozenset(by_target)
+        if covered:
+            target_ops = tuple(
+                PlannedOperation(
+                    by_target[target].left, by_target[target].operator,
+                    by_target[target].right, target, True,
+                )
+                for target in sorted(covered)
+            )
+            candidates.append((prefix + target_ops, covered))
+
+        if len(prefix) >= max_intermediates:
+            continue
+        recipes = [
+            recipe for recipe in _pair_recipes(tuple(sorted(available)), limit)
+            if recipe.result not in available and recipe.result not in goals
+        ]
+        recipes.sort(key=_recipe_order)
+        for recipe in reversed(recipes[:max_recipes_per_state]):
+            operation = PlannedOperation(
+                recipe.left, recipe.operator, recipe.right, recipe.result, False
+            )
+            stack.append((available.union((recipe.result,)), prefix + (operation,)))
+
+    # Deduplicate exact proposals, then retain the best bounded set by yield
+    # density, absolute coverage, instruction count, and deterministic shape.
+    unique = {}
+    for operations, covered in candidates:
+        key = (
+            tuple((op.left, op.operator, op.right, op.result) for op in operations),
+            tuple(sorted(covered)),
+        )
+        unique[key] = (operations, covered)
+    ranked = sorted(
+        unique.values(),
+        key=lambda item: (
+            -Fraction(len(item[1]), max(1, len(item[0]))),
+            -len(item[1]),
+            len(item[0]),
+            tuple((op.result, op.operator, op.left, op.right) for op in item[0]),
+        ),
+    )
+    return tuple(ranked[:max_candidates])
+
+
 def plan_bounded_beam(
     starting_values: tuple[int, ...] | list[int],
     targets: tuple[int, ...] | list[int],
@@ -551,8 +639,58 @@ def plan_bounded_beam(
                 winner.operations, frozenset(goals), (), frozenset(starts)
             )
 
-    if best.operations:
+    # Compare incomplete beam output against bounded partial motifs. Unlike
+    # complete-witness search, these candidates optimize marginal target yield
+    # per emitted instruction and may be preferable even when they leave goals.
+    partial_options = []
+    for operations, covered in _partial_subgraph_motifs(
+        starts, initial.missing, value_limit,
+        max_intermediates=min(max_intermediates, max_depth),
+    ):
+        try:
+            schedule_value_dag(operations, starts, value_limit)
+            peak = estimate_peak_live_values(operations, starts)
+        except (ValueError, RuntimeError):
+            continue
+        partial_options.append((
+            -Fraction(len(covered), max(1, len(operations))),
+            -len(covered),
+            len(operations),
+            peak,
+            tuple((op.result, op.operator, op.left, op.right) for op in operations),
+            operations,
+            covered,
+        ))
+
+    beam_covered = frozenset(set(goals).difference(best.missing))
+    if beam_covered and best.operations:
         schedule_value_dag(best.operations, starts, value_limit)
+        beam_peak = estimate_peak_live_values(best.operations, starts)
+        partial_options.append((
+            -Fraction(len(beam_covered), max(1, len(best.operations))),
+            -len(beam_covered),
+            len(best.operations),
+            beam_peak,
+            tuple((op.result, op.operator, op.left, op.right) for op in best.operations),
+            best.operations,
+            beam_covered,
+        ))
+
+    if partial_options:
+        winner = min(partial_options)
+        return SharedIntermediatePlan(
+            operations=winner[5],
+            covered_targets=frozenset(set(goals).difference(
+                set(initial.missing).difference(winner[6])
+            )),
+            missing_targets=tuple(sorted(
+                set(goals).difference(
+                    set(goals).intersection(starts).union(winner[6])
+                )
+            )),
+            initial_values=frozenset(starts),
+        )
+
     return SharedIntermediatePlan(
         operations=best.operations,
         covered_targets=frozenset(set(goals).difference(best.missing)),
