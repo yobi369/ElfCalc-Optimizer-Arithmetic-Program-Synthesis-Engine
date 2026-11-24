@@ -447,6 +447,8 @@ def plan_bounded_beam(
     max_depth: int = 4,
     beam_width: int = 32,
     max_expansions_per_state: int = 512,
+    enable_complete_witnesses: bool = True,
+    enable_partial_motifs: bool = True,
 ) -> SharedIntermediatePlan:
     """Search a bounded beam of partial arithmetic DAGs.
 
@@ -501,7 +503,7 @@ def plan_bounded_beam(
     witness_intermediate_budget = min(
         max_intermediates, max(0, max_depth - len(initial.missing))
     )
-    if initial.missing and witness_intermediate_budget >= 2:
+    if enable_complete_witnesses and initial.missing and witness_intermediate_budget >= 2:
         verified_witnesses = []
         for witness in _shared_subgraph_witnesses(
             starts, initial.missing, value_limit,
@@ -643,10 +645,14 @@ def plan_bounded_beam(
     # complete-witness search, these candidates optimize marginal target yield
     # per emitted instruction and may be preferable even when they leave goals.
     partial_options = []
-    for operations, covered in _partial_subgraph_motifs(
-        starts, initial.missing, value_limit,
-        max_intermediates=min(max_intermediates, max_depth),
-    ):
+    partial_motifs = (
+        _partial_subgraph_motifs(
+            starts, initial.missing, value_limit,
+            max_intermediates=min(max_intermediates, max_depth),
+        )
+        if enable_partial_motifs else ()
+    )
+    for operations, covered in partial_motifs:
         if len(operations) > max_depth:
             continue
         try:
