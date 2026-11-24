@@ -145,3 +145,5 @@ A targeted synthetic fixture now isolates the precise capability partial motifs 
 - Goal 99 remains explicitly uncovered.
 
 This directly demonstrates the intended distinction: partial search can preserve a useful subset even when no complete witness exists under the same intermediate budget. The test checks both outcomes and sends the partial proposal through register scheduling and VM replay. It does not yet show that partial motifs improve the final competition objective, nor that they outperform ordinary beam search on a broad fixture distribution.
+
+A second subset fixture tests accumulation across target families: starts `(2, 3, 5)`, goals `(10, 12, 15, 18, 99)`, one intermediate. The initial values already expose 10 and 15; intermediate 6 then exposes 12 and 18. Partial search should retain a five-instruction proposal covering four of five goals, while complete-witness search cannot cover 99 within the one-intermediate limit. This checks that partial search can preserve direct yields while adding a shared-factor motif, rather than only succeeding on one isolated pair.
