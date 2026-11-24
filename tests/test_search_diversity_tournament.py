@@ -1,4 +1,4 @@
-"""Eight-way synthetic tournament for beam identity, diversity, and caching.
+"""Six-configuration synthetic tournament for beam identity, diversity, and caching.
 
 Run with: python -m unittest tests.test_search_diversity_tournament -v
 
@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import elfcalc.bounded_search as search
 from elfcalc.register_schedule import estimate_peak_live_values, schedule_value_dag
+from elfcalc.puzzle import Puzzle
+from elfcalc.validation import validate_program
 
 
 FIXTURES = (
@@ -50,7 +52,7 @@ def _ordinary_admission(states, beam_width, starts, limit, subgraph_support=None
 
 
 class SearchDiversityTournamentTests(TestCase):
-    def test_eight_way_tournament_across_synthetic_families(self):
+    def test_six_configuration_tournament_across_synthetic_families(self):
         rows = []
         configurations = (
             ("original_dedup", False, False),
@@ -68,6 +70,7 @@ class SearchDiversityTournamentTests(TestCase):
                     "frontiers_generated": 0,
                 }
                 native_cached = search._cached_pair_recipes
+                native_pair_recipes = search._pair_recipes
                 native_key = search._state_key
                 native_admission = search._select_diverse_beam
 
@@ -77,11 +80,14 @@ class SearchDiversityTournamentTests(TestCase):
                         return native_key(state, starts)
                     return _original_state_key(state, starts)
 
+                def counted_pair_recipes(values, limit):
+                    counters["frontiers_generated"] += 1
+                    return native_pair_recipes(values, limit)
+
                 def counted_frontier(values, limit):
                     counters["frontier_requests"] += 1
                     if cache_enabled:
                         return native_cached(values, limit)
-                    counters["frontiers_generated"] += 1
                     return tuple(search._pair_recipes(values, limit))
 
                 selected_admission = native_admission if diversity else _ordinary_admission
@@ -91,6 +97,7 @@ class SearchDiversityTournamentTests(TestCase):
                     patch.object(search, "_state_key", counted_key),
                     patch.object(search, "_select_diverse_beam", selected_admission),
                     patch.object(search, "_cached_pair_recipes", counted_frontier),
+                    patch.object(search, "_pair_recipes", counted_pair_recipes),
                 ):
                     plan = search.plan_bounded_beam(
                         fixture["starts"], fixture["targets"], fixture["limit"],
@@ -105,7 +112,14 @@ class SearchDiversityTournamentTests(TestCase):
                 allocation = schedule_value_dag(
                     plan.operations, fixture["starts"], fixture["limit"]
                 )
-                self.assertTrue(allocation, (fixture["name"], strategy, cache_enabled))
+                self.assertEqual(len(allocation), len(plan.operations))
+                covered = tuple(sorted(plan.covered_targets))
+                self.assertTrue(covered, (fixture["name"], strategy, cache_enabled))
+                replay = validate_program(
+                    Puzzle(fixture["name"], fixture["starts"], covered, fixture["limit"]),
+                    allocation,
+                )
+                self.assertTrue(replay.complete, replay.error)
                 self.assertEqual(
                     set(plan.covered_targets).union(plan.missing_targets),
                     set(fixture["targets"]),
@@ -132,6 +146,9 @@ class SearchDiversityTournamentTests(TestCase):
                     (pair[0]["coverage"], pair[0]["instructions"], pair[0]["peak_live"]),
                     (pair[1]["coverage"], pair[1]["instructions"], pair[1]["peak_live"]),
                 )
+                cached = next(row for row in pair if row["cache"])
+                uncached = next(row for row in pair if not row["cache"])
+                self.assertLessEqual(cached["frontiers_generated"], uncached["frontiers_generated"])
 
         print("SEARCH_DIVERSITY_FRONTIER_TOURNAMENT")
         for row in rows:
