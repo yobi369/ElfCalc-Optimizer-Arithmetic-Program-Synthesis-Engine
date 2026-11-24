@@ -556,6 +556,34 @@ def _partial_subgraph_motifs(
     return tuple(ranked[:max_candidates])
 
 
+def _remaining_instruction_lower_bound(state: _State, goals: frozenset[int], limit: int) -> int:
+    """Admissible lower bound on additional instructions from a search state.
+
+    Every missing target needs its own producing instruction. If a missing
+    target is not reachable even from the optimistic set containing all goals,
+    current values, and existing intermediates, at least one additional
+    non-target intermediate is also necessary. The optimistic set deliberately
+    grants all not-yet-produced targets for free, so this extra instruction is
+    a conservative lower bound. For large frontiers, skip the quadratic probe.
+    """
+    missing_count = len(state.missing)
+    if not missing_count:
+        return 0
+    optimistic = tuple(sorted(
+        set(state.available).union(goals).union(
+            op.result for op in state.operations if not op.is_target
+        )
+    ))
+    if len(optimistic) > 64:
+        return missing_count
+    reachable = {
+        recipe.result
+        for recipe in _cached_pair_recipes(optimistic, limit)
+        if recipe.result in state.missing
+    }
+    return missing_count + int(len(reachable) < missing_count)
+
+
 def plan_bounded_beam(
     starting_values: tuple[int, ...] | list[int],
     targets: tuple[int, ...] | list[int],
@@ -573,6 +601,7 @@ def plan_bounded_beam(
     motif_result_budget: int = 64,
     enable_target_cone_guidance: bool = True,
     enable_shared_subgraph_guidance: bool = True,
+    enable_instruction_lower_bound_pruning: bool = False,
 ) -> SharedIntermediatePlan:
     """Search a bounded beam of partial arithmetic DAGs.
 
@@ -769,6 +798,16 @@ def plan_bounded_beam(
                     missing=state.missing.difference((recipe.result,)),
                     intermediates=state.intermediates + int(not is_target),
                 )
+                if enable_instruction_lower_bound_pruning:
+                    remaining_lb = _remaining_instruction_lower_bound(
+                        child, frozenset(goals), value_limit
+                    )
+                    if len(child.operations) + remaining_lb > max_depth:
+                        continue
+                    if (child.intermediates
+                            + max(0, remaining_lb - len(child.missing))
+                            > max_intermediates):
+                        continue
                 key = _state_key(child, starts)
                 if key in seen:
                     continue
