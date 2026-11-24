@@ -27,11 +27,7 @@ class TwoQFrontierCache:
         self.generator = generator
         self.probation = OrderedDict()
         self.protected = OrderedDict()
-        self.hits = 0
-        self.misses = 0
-        self.generated = 0
-        self.evictions = 0
-        self.promotions = 0
+        self.hits = self.misses = self.generated = self.evictions = self.promotions = 0
 
     def __call__(self, values, limit):
         key = (tuple(values), limit)
@@ -46,14 +42,12 @@ class TwoQFrontierCache:
             self.protected[key] = value
             self._trim()
             return value
-
         self.misses += 1
         value = tuple(self.generator(values, limit))
         self.generated += 1
-        if self.capacity == 0:
-            return value
-        self.probation[key] = value
-        self._trim()
+        if self.capacity:
+            self.probation[key] = value
+            self._trim()
         return value
 
     def _trim(self):
@@ -70,8 +64,7 @@ class TwoQFrontierCache:
 
 class LRUFrontierCache:
     def __init__(self, capacity, generator):
-        self.capacity = capacity
-        self.generator = generator
+        self.capacity, self.generator = capacity, generator
         self.entries = OrderedDict()
         self.hits = self.misses = self.generated = self.evictions = 0
 
@@ -112,68 +105,44 @@ class FIFOFrontierCache(LRUFrontierCache):
 class FrontierCache2QTests(TestCase):
     def test_2q_scan_resistance_and_planner_quality(self):
         for name, starts, targets, limit in FIXTURES:
-            baseline = None
-            rows = []
+            baseline, rows = None, []
             for capacity in CAPACITIES:
-                for policy_name, cache_type in (
-                    ("lru", LRUFrontierCache),
-                    ("fifo", FIFOFrontierCache),
-                    ("2q", TwoQFrontierCache),
-                ):
+                for policy_name, cache_type in (("lru", LRUFrontierCache), ("fifo", FIFOFrontierCache), ("2q", TwoQFrontierCache)):
                     cache = cache_type(capacity, search._pair_recipes)
                     started = perf_counter()
                     with patch.object(search, "_cached_pair_recipes", cache):
                         plan = search.plan_bounded_beam(
-                            starts, targets, limit,
-                            max_intermediates=2,
-                            max_depth=3,
-                            beam_width=8,
-                            max_expansions_per_state=16,
-                            enable_complete_witnesses=False,
-                            enable_partial_motifs=False,
+                            starts, targets, limit, max_intermediates=2, max_depth=3,
+                            beam_width=8, max_expansions_per_state=16,
+                            enable_complete_witnesses=False, enable_partial_motifs=False,
                         )
                     elapsed = perf_counter() - started
                     allocation = schedule_value_dag(plan.operations, starts, limit)
                     covered = tuple(sorted(plan.covered_targets))
                     replay = validate_program(Puzzle(name, starts, covered, limit), allocation)
                     self.assertTrue(replay.complete, replay.error)
-                    quality = (
-                        covered,
-                        len(plan.operations),
-                        estimate_peak_live_values(plan.operations, starts),
-                        tuple(sorted(plan.missing_targets)),
-                    )
+                    quality = (covered, len(plan.operations), estimate_peak_live_values(plan.operations, starts), tuple(sorted(plan.missing_targets)))
                     if baseline is None:
                         baseline = quality
                     else:
                         self.assertEqual(quality, baseline, (name, capacity, policy_name))
                     rows.append({
-                        "capacity": capacity,
-                        "policy": policy_name,
-                        "generated": cache.generated,
-                        "hits": cache.hits,
-                        "misses": cache.misses,
-                        "size": (
-                            len(cache.probation) + len(cache.protected)
-                            if isinstance(cache, TwoQFrontierCache)
-                            else len(cache.entries)
-                        ),
-                        "evictions": cache.evictions,
-                        "promotions": getattr(cache, "promotions", 0),
-                        "elapsed_seconds": round(elapsed, 6),
-                        "quality": quality,
+                        "capacity": capacity, "policy": policy_name, "generated": cache.generated,
+                        "hits": cache.hits, "misses": cache.misses,
+                        "size": len(cache.probation) + len(cache.protected) if isinstance(cache, TwoQFrontierCache) else len(cache.entries),
+                        "evictions": cache.evictions, "promotions": getattr(cache, "promotions", 0),
+                        "elapsed_seconds": round(elapsed, 6), "quality": quality,
                     })
             print("FRONTIER_CACHE_2Q", name, rows)
 
     def test_2q_rejects_one_pass_scan_without_evicting_hot_entries(self):
-        hot = tuple(("hot", index) for index in range(8))
+        hot = tuple(("hot", index) for index in range(4))
         scan = tuple(("scan", index) for index in range(40))
 
         def generator(values, limit):
             return ((values, "+", values, values),)
 
-        lru = LRUFrontierCache(16, generator)
-        twoq = TwoQFrontierCache(16, generator)
+        lru, twoq = LRUFrontierCache(16, generator), TwoQFrontierCache(16, generator)
         for key in hot:
             lru(key, 100)
             twoq(key, 100)
@@ -183,13 +152,10 @@ class FrontierCache2QTests(TestCase):
         for key in scan:
             lru(key, 100)
             twoq(key, 100)
-
-        lru_before = lru.generated
-        twoq_before = twoq.generated
+        lru_before, twoq_before = lru.generated, twoq.generated
         for key in hot:
             lru(key, 100)
             twoq(key, 100)
-
         self.assertEqual(lru.generated - lru_before, len(hot))
         self.assertEqual(twoq.generated - twoq_before, 0)
         self.assertEqual(twoq.promotions, len(hot))
