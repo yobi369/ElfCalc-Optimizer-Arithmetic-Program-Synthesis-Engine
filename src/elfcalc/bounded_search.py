@@ -328,13 +328,13 @@ def plan_bounded_beam(
     target_support = _multi_target_cone_support(
         initial.missing, anchor_pool, value_limit, max_depth, 1024
     )
-    target_cone = frozenset(set(target_support).union(subgraph_support))
     # A second, bounded look-ahead detects two-node shared subgraphs. Unlike
     # reverse-cone support, this explicitly asks whether a first intermediate
     # can lead to a second intermediate that jointly exposes several goals.
     subgraph_support = _shared_subgraph_support(
         starts, initial.missing, value_limit
     )
+    target_cone = frozenset(set(target_support).union(subgraph_support))
     seen = {_state_key(initial, starts)}
 
     for _depth in range(max_depth):
