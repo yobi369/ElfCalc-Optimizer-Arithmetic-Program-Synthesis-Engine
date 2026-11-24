@@ -236,8 +236,11 @@ class BoundedBeamPlannerTests(unittest.TestCase):
                 "elapsed_seconds": elapsed[name],
             }
         print("SHARED_BRIDGE_STRATEGY_METRICS", metrics)
+        self.assertEqual(metrics["beam_only"]["coverage"], 1)
         self.assertEqual(metrics["complete_witness"]["coverage"], 2)
         self.assertEqual(metrics["partial_motif"]["coverage"], 2)
+        self.assertEqual(metrics["complete_witness"]["instructions"], 4)
+        self.assertEqual(metrics["partial_motif"]["instructions"], 4)
 
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
