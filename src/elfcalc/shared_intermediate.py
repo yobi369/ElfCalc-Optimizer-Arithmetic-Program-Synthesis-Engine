@@ -189,6 +189,45 @@ def _best_two_intermediate_chain(
     return None if best is None else best[1:]
 
 
+def _best_cooperating_intermediates(
+    recipes_by_result: dict[int, ArithmeticRelation],
+    missing: frozenset[int],
+    limit: int,
+):
+    """Find two independent frontier recipes that jointly produce targets.
+
+    Both intermediate recipes are already reachable from the current frontier.
+    The target-side equation is inverted against each possible second
+    intermediate, avoiding an all-pairs Cartesian product of recipe values.
+    """
+    candidates = tuple(sorted(recipes_by_result))
+    pairs: dict[tuple[int, int], dict[int, ArithmeticRelation]] = {}
+    for target in sorted(missing):
+        for second in candidates:
+            for first, target_recipe in _inverse_target_candidates(
+                target, second, limit
+            ):
+                if first == second or first not in recipes_by_result:
+                    continue
+                pair = tuple(sorted((first, second)))
+                pairs.setdefault(pair, {}).setdefault(target, target_recipe)
+
+    best = None
+    for (first, second), target_map in sorted(pairs.items()):
+        target_recipes = tuple(target_map[target] for target in sorted(target_map))
+        first_recipe = recipes_by_result[first]
+        second_recipe = recipes_by_result[second]
+        rank = (
+            len(target_recipes),
+            -first,
+            -second,
+            tuple(_recipe_order(recipe) for recipe in target_recipes),
+        )
+        if best is None or rank > best[0]:
+            best = (rank, first_recipe, second_recipe, target_recipes)
+    return None if best is None else best[1:]
+
+
 def _extend_recipe_frontier(
     recipes_by_result: dict[int, ArithmeticRelation],
     available: set[int],
@@ -291,20 +330,28 @@ def plan_shared_intermediates(
             chain = _best_two_intermediate_chain(
                 recipes_by_result, frontier, frozenset(missing), value_limit
             )
-            if chain is None:
-                break
-            first_recipe, bridge_recipe, target_recipes = chain
-            operations.append(PlannedOperation(
-                first_recipe.left, first_recipe.operator, first_recipe.right,
-                first_recipe.result, False,
-            ))
-            operations.append(PlannedOperation(
-                bridge_recipe.left, bridge_recipe.operator, bridge_recipe.right,
-                bridge_recipe.result, False,
-            ))
-            available.update((first_recipe.result, bridge_recipe.result))
+            if chain is not None:
+                first_recipe, bridge_recipe, target_recipes = chain
+                intermediate_recipes = (first_recipe, bridge_recipe)
+            else:
+                cooperating = _best_cooperating_intermediates(
+                    recipes_by_result, frozenset(missing), value_limit
+                )
+                if cooperating is None:
+                    break
+                first_recipe, bridge_recipe, target_recipes = cooperating
+                intermediate_recipes = (first_recipe, bridge_recipe)
+
+            operations.extend(
+                PlannedOperation(
+                    recipe.left, recipe.operator, recipe.right,
+                    recipe.result, False,
+                )
+                for recipe in intermediate_recipes
+            )
+            available.update(recipe.result for recipe in intermediate_recipes)
             intermediate_count += 2
-            newly_available = {first_recipe.result, bridge_recipe.result}
+            newly_available = {recipe.result for recipe in intermediate_recipes}
             for target_recipe in target_recipes:
                 if target_recipe.result not in missing:
                     continue
