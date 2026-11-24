@@ -177,3 +177,16 @@ Many states and ranking probes ask for the same one-step recipe list for an iden
 ### Research status
 
 This is a structural diversity correction and a reduction in repeated frontier-generation work. It is not yet evidence of improved target coverage or lower end-to-end runtime. The next comparison should measure unique structural states admitted, states pruned by beam width, repeated recipe-frontier cache hits, target coverage, instruction count, and peak live values across fixtures designed with multiple derivations of the same intermediate value. No competition archive has been inspected for this work; the 130,974 incumbent remains unchanged.
+
+### Stratified beam admission
+
+A further diversity control now reserves beam slots for distinct first-intermediate recipe families. Candidates are still ordered by the existing objective rank, but the first admission pass takes the best candidate from each distinct first intermediate recipe before filling unused slots from the global ranking. This targets a specific frontier-economics failure mode: many descendants of one early arithmetic choice can otherwise crowd out a structurally different branch with the same immediate coverage and cost.
+
+The selection remains deterministic and bounded by `beam_width`. It does not increase the maximum number of retained states. A synthetic regression supplies three states with the same available values, missing targets, instruction count, and intermediate count; two share the same first recipe while the third has a different first recipe. With a two-state beam, selection must preserve both recipe families.
+
+The provenance-aware state key, stratified beam admission, and bounded exact-recipe cache are complementary controls:
+- provenance-aware identity prevents premature global deduplication;
+- stratified admission protects distinct first-step families when the beam is narrowed;
+- cached recipe tuples avoid regenerating identical one-step arithmetic frontiers.
+
+These changes should be judged by whether they improve coverage or solution quality at fixed beam width and expansion budgets, not by state diversity alone.
