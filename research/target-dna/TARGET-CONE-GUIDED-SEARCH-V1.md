@@ -135,3 +135,13 @@ Wall-clock observations for Fixture B varied by CI interpreter/runner: approxima
 A further static review found that the complete-witness DFS keyed visited states only by available values and prefix length. That could merge two different arithmetic derivations that reached the same value frontier at the same depth, potentially discarding a distinct valid witness before register-pressure evaluation. The key now includes a canonicalized operation-provenance signature. Partial-motif state signatures are also canonicalized so equivalent operation sets reached in different expansion orders do not consume duplicate state budget.
 
 A regression fixture confirms that both `2+2=4` and `2*2=4` derivations survive when each can participate in a valid `4+6=10` witness. All returned witnesses are scheduled and replayed. CI passed all 98 tests on Python 3.10, 3.11, and 3.12. This preserves alternative provenance; it does not claim globally optimal witness enumeration.
+
+### Partial-motif advantage isolated (2026-11-24)
+
+A targeted synthetic fixture now isolates the precise capability partial motifs are intended to provide. Starts are `(2, 3)`; goals are `(12, 18, 99)`; the auxiliary search is allowed only one intermediate.
+
+- Complete-witness search returns no proposal: it requires all three goals to be exposed by the same available frontier, and 99 is not reachable within this one-intermediate budget.
+- Partial-motif search returns a replayable three-instruction proposal covering 12 and 18: `2*3=6`, `6*2=12`, `6*3=18`.
+- Goal 99 remains explicitly uncovered.
+
+This directly demonstrates the intended distinction: partial search can preserve a useful subset even when no complete witness exists under the same intermediate budget. The test checks both outcomes and sends the partial proposal through register scheduling and VM replay. It does not yet show that partial motifs improve the final competition objective, nor that they outperform ordinary beam search on a broad fixture distribution.
