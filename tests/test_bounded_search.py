@@ -289,6 +289,33 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         self.assertEqual(operations[0].result, 6)
         self.assertTrue(schedule_value_dag(operations, starts, 1000))
 
+    def test_partial_motif_accumulates_multiple_target_families(self):
+        # Direct targets 10 and 15 coexist with the shared-factor pair
+        # 12 and 18. A single intermediate 6 unlocks the latter pair;
+        # 99 is deliberately outside this one-intermediate frontier.
+        starts = (2, 3, 5)
+        goals = frozenset({10, 12, 15, 18, 99})
+        complete = _shared_subgraph_witnesses(
+            starts, goals, 1000,
+            max_intermediates=1,
+            max_recipes_per_state=128,
+            max_states=4096,
+            max_witnesses=64,
+        )
+        partial = _partial_subgraph_motifs(
+            starts, goals, 1000,
+            max_intermediates=1,
+            max_recipes_per_state=128,
+            max_states=4096,
+            max_candidates=64,
+        )
+        self.assertEqual(complete, ())
+        operations, covered = partial[0]
+        self.assertEqual(covered, frozenset({10, 12, 15, 18}))
+        self.assertEqual(len(operations), 5)
+        self.assertIn(6, {op.result for op in operations})
+        self.assertTrue(schedule_value_dag(operations, starts, 1000))
+
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
