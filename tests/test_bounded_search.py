@@ -56,6 +56,16 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         )
         self.assertEqual(support[6], frozenset({12, 18}))
 
+    def test_beam_uses_shared_intermediate_for_multiple_targets(self):
+        plan = plan_bounded_beam(
+            [2, 3], [12, 18], 1000,
+            max_intermediates=1, max_depth=3, beam_width=64,
+        )
+        self.assertEqual(plan.missing_targets, ())
+        self.assertEqual(plan.intermediate_count, 1)
+        self.assertIn(6, {op.result for op in plan.operations})
+        self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
+
     def test_multi_target_cone_is_deterministic(self):
         args = (frozenset({12, 18, 24}), (2, 3), 1000, 2, 128)
         self.assertEqual(
