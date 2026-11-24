@@ -25,12 +25,14 @@ class FrontierCacheEconomicsTests(TestCase):
             for fixture in fixtures:
                 for capacity in CAPACITIES:
                     generated = {"count": 0}
+                    native_generator = search._pair_recipes
 
                     def counted_generator(values, limit):
                         generated["count"] += 1
-                        return native_generator(values, limit)
+                        # The production cache stores a tuple, not a generator.
+                        # Materialize here so cache hits replay the full frontier.
+                        return tuple(native_generator(values, limit))
 
-                    native_generator = search._pair_recipes
                     cached = lru_cache(maxsize=capacity)(counted_generator) if capacity else None
                     requests = {"count": 0}
                     started = perf_counter()
