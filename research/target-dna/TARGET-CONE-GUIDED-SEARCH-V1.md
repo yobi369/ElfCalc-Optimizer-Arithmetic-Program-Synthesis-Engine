@@ -155,3 +155,25 @@ The multi-family fixture exposed a ranking flaw: pure yield-density-first rankin
 ### Multi-family comparison result (2026-11-24)
 
 The planner-level comparison ran beam-only, complete-witness-enabled, and partial-motif-enabled modes on the same `(2, 3, 5)` → `(10, 12, 15, 18, 99)` fixture, with identical beam limits and motif caps. All three modes returned the same 4/5 coverage in five instructions, with peak-live 2. Runtime was approximately 4.5–6.5 seconds per mode across CI runners and is not meaningfully different. Thus, although the partial-motif helper can explicitly retain a useful subset when no complete witness exists, it did **not** improve the final planner result over beam-only on this fixture. The current evidence supports partial motifs as a fallback/candidate-generation capability, not as a demonstrated performance improvement. Production integration remains unjustified.
+
+## Search diversity and frontier economics (2026-11-24)
+
+### Finding: equal value sets can hide different future potential
+
+The beam's global `seen` key previously represented a state using only missing targets, available values, instruction count, peak live values, and intermediate count. Two different arithmetic DAGs can have identical values and costs while carrying different provenance and dependency structures. Treating them as identical can silently discard one branch before the beam-width and Pareto controls get a chance to compare it.
+
+The key now includes a canonical sorted operation-provenance signature `(result, operator, left, right)`. This preserves distinct DAG structures while still collapsing the same operation set reached in a different order. The beam width remains the hard cap on retained states, so diversity is admitted under an explicit frontier-size constraint rather than growing without bound.
+
+### Finding: repeated arithmetic frontier generation is avoidable work
+
+Many states and ranking probes ask for the same one-step recipe list for an identical sorted value set and value limit. The bounded search now uses a 256-entry LRU cache of immutable recipe tuples. This reuses exact arithmetic results without changing recipe ordering or arithmetic semantics. The cache is bounded to limit memory growth.
+
+### Regression coverage
+
+- Equal available-value sets and equal instruction/pressure metrics with different recipes must have different beam state keys.
+- Repeated requests for the same sorted value frontier return the same cached immutable recipe tuple.
+- Existing synthetic shared-motif, register scheduling, and VM replay tests remain in the suite.
+
+### Research status
+
+This is a structural diversity correction and a reduction in repeated frontier-generation work. It is not yet evidence of improved target coverage or lower end-to-end runtime. The next comparison should measure unique structural states admitted, states pruned by beam width, repeated recipe-frontier cache hits, target coverage, instruction count, and peak live values across fixtures designed with multiple derivations of the same intermediate value. No competition archive has been inspected for this work; the 130,974 incumbent remains unchanged.
