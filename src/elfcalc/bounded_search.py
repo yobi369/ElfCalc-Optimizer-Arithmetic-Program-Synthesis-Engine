@@ -781,11 +781,6 @@ def plan_bounded_beam(
         beam = _select_diverse_beam(
             frontier, beam_width, starts, value_limit, subgraph_support
         )
-        if (max_total_state_expansions is not None
-                and total_state_expansions >= max_total_state_expansions):
-            # The current generation is retained, but no further beam states
-            # may be expanded beyond the explicit global state budget.
-            pass
         if beam and _rank(beam[0], starts, value_limit, subgraph_support) < _rank(best, starts, value_limit, subgraph_support):
             best = beam[0]
         complete = [state for state in beam if not state.missing]
