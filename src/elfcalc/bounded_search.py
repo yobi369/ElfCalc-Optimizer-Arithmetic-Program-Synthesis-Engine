@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from .register_schedule import estimate_peak_live_values
+from .register_schedule import estimate_peak_live_values, schedule_value_dag
 from .shared_intermediate import (
     PlannedOperation,
     SharedIntermediatePlan,
@@ -26,8 +26,17 @@ class _State:
     intermediates: int
 
 
-def _state_key(state: _State) -> tuple[tuple[int, ...], tuple[int, ...]]:
-    return tuple(sorted(state.missing)), tuple(sorted(state.available))
+def _state_key(
+    state: _State, starts: tuple[int, ...]
+) -> tuple[tuple[int, ...], tuple[int, ...], int, int, int]:
+    """Deduplicate equivalent frontiers without erasing cost/pressure trade-offs."""
+    return (
+        tuple(sorted(state.missing)),
+        tuple(sorted(state.available)),
+        len(state.operations),
+        _peak(state, starts),
+        state.intermediates,
+    )
 
 
 def _direct_yield(state: _State, limit: int) -> int:
@@ -103,6 +112,8 @@ def plan_bounded_beam(
     is deterministic and bounded by depth, beam width, and per-state expansion
     count. It is not complete and makes no optimality claim.
     """
+    if type(value_limit) is not int or value_limit <= 0:
+        raise ValueError("value_limit must be a positive integer")
     starts = tuple(starting_values)
     goals = tuple(targets)
     if not starts or any(type(v) is not int or v <= 0 or v > value_limit for v in starts):
@@ -129,7 +140,7 @@ def plan_bounded_beam(
     )
     beam = (initial,)
     best = initial
-    seen = {_state_key(initial)}
+    seen = {_state_key(initial, starts)}
 
     for _depth in range(max_depth):
         expanded: list[_State] = []
@@ -175,7 +186,7 @@ def plan_bounded_beam(
                     missing=state.missing.difference((recipe.result,)),
                     intermediates=state.intermediates + int(not is_target),
                 )
-                key = _state_key(child)
+                key = _state_key(child, starts)
                 if key in seen:
                     continue
                 seen.add(key)
@@ -195,10 +206,15 @@ def plan_bounded_beam(
                 len(state.operations), _peak(state, starts),
                 tuple((op.result, op.operator, op.left, op.right) for op in state.operations),
             ))
+            # A proposal is not trusted until the production scheduler has
+            # allocated registers and replayed every instruction in the VM.
+            schedule_value_dag(winner.operations, starts, value_limit)
             return SharedIntermediatePlan(
                 winner.operations, frozenset(goals), (), frozenset(starts)
             )
 
+    if best.operations:
+        schedule_value_dag(best.operations, starts, value_limit)
     return SharedIntermediatePlan(
         operations=best.operations,
         covered_targets=frozenset(set(goals).difference(best.missing)),
