@@ -80,6 +80,19 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         self.assertEqual(plan.intermediate_count, 2)
         self.assertEqual(tuple(op.result for op in plan.operations), (4, 8, 16))
 
+    def test_independent_intermediates_cooperate_to_make_target(self):
+        # 2/2=1 and 5*5=25 are independent; 1+25=26.
+        plan = plan_shared_intermediates([2, 5], [26], 100)
+        self.assertEqual(plan.covered_targets, frozenset({26}))
+        self.assertEqual(plan.missing_targets, ())
+        self.assertEqual(plan.intermediate_count, 2)
+        self.assertEqual(tuple(op.result for op in plan.operations), (1, 25, 26))
+
+    def test_cooperating_intermediates_respect_budget(self):
+        plan = plan_shared_intermediates([2, 5], [26], 100, max_intermediates=1)
+        self.assertEqual(plan.missing_targets, (26,))
+        self.assertEqual(plan.intermediate_count, 0)
+
     def test_two_intermediate_chain_respects_budget(self):
         plan = plan_shared_intermediates([2, 3], [16], 20, max_intermediates=1)
         self.assertEqual(plan.covered_targets, frozenset())
