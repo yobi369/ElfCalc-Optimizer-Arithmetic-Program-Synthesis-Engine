@@ -190,6 +190,53 @@ def _shared_completion_yield(
     })
 
 
+def _select_diverse_beam(
+    states: Iterable[_State],
+    beam_width: int,
+    starts: tuple[int, ...],
+    limit: int,
+    subgraph_support: dict[int, frozenset[int]] | None = None,
+) -> tuple[_State, ...]:
+    """Reserve beam slots for distinct first-intermediate recipe families.
+
+    Candidates are ranked normally, but the first pass keeps the best state
+    from each distinct first intermediate recipe before filling remaining
+    slots by global rank. This prevents several near-identical descendants of
+    one early choice from occupying the entire narrow beam.
+    """
+    ranked = sorted(
+        states,
+        key=lambda state: _rank(state, starts, limit, subgraph_support),
+    )
+    selected = []
+    selected_ids = set()
+    seen_roots = set()
+    for state in ranked:
+        roots = [
+            op for op in state.operations if not op.is_target
+        ]
+        if roots:
+            root = min(
+                (op.result, op.operator, op.left, op.right) for op in roots
+            )
+        else:
+            root = ("direct", tuple(sorted(state.missing)))
+        if root in seen_roots:
+            continue
+        seen_roots.add(root)
+        selected.append(state)
+        selected_ids.add(id(state))
+        if len(selected) >= beam_width:
+            return tuple(selected)
+    for state in ranked:
+        if id(state) in selected_ids:
+            continue
+        selected.append(state)
+        if len(selected) >= beam_width:
+            break
+    return tuple(selected)
+
+
 def _rank(
     state: _State,
     starts: tuple[int, ...],
@@ -652,9 +699,9 @@ def plan_bounded_beam(
         if not expanded:
             break
         frontier = _pareto_by_coverage(expanded, starts)
-        beam = tuple(sorted(
-            frontier, key=lambda state: _rank(state, starts, value_limit, subgraph_support)
-        )[:beam_width])
+        beam = _select_diverse_beam(
+            frontier, beam_width, starts, value_limit, subgraph_support
+        )
         if beam and _rank(beam[0], starts, value_limit, subgraph_support) < _rank(best, starts, value_limit, subgraph_support):
             best = beam[0]
         complete = [state for state in beam if not state.missing]
