@@ -123,6 +123,34 @@ def _backward_target_cone(
     return frozenset(cone)
 
 
+
+def _multi_target_cone_support(
+    goals: frozenset[int],
+    anchors: tuple[int, ...],
+    limit: int,
+    depth: int,
+    cap_per_target: int,
+) -> dict[int, frozenset[int]]:
+    """Map each reverse-cone value to the goals it can potentially unlock.
+
+    Cones are constructed independently per goal so shared values retain their
+    target provenance. A value supported by several goals is a candidate
+    shared intermediate. Per-goal caps keep this computation deterministic
+    and bounded; this remains a heuristic reachability signal.
+    """
+    support: dict[int, set[int]] = {}
+    for goal in sorted(goals):
+        cone = _backward_target_cone(
+            frozenset((goal,)), anchors, limit, depth, cap_per_target
+        )
+        for value in cone:
+            support.setdefault(value, set()).add(goal)
+    return {
+        value: frozenset(targets)
+        for value, targets in sorted(support.items())
+    }
+
+
 def _rank(state: _State, starts: tuple[int, ...], limit: int) -> tuple:
     # Coverage is primary. Direct one-step reachability is a useful potential
     # signal; cost and live pressure then control resource efficiency.
@@ -214,9 +242,10 @@ def plan_bounded_beam(
     # closure from the initial registers. This gives the beam a target-directed
     # candidate filter without making the search complete or unbounded.
     anchor_pool = _forward_anchor_pool(starts, value_limit, max_depth, 512)
-    target_cone = _backward_target_cone(
-        initial.missing, anchor_pool, value_limit, max_depth, 4096
+    target_support = _multi_target_cone_support(
+        initial.missing, anchor_pool, value_limit, max_depth, 1024
     )
+    target_cone = frozenset(target_support)
     seen = {_state_key(initial, starts)}
 
     for _depth in range(max_depth):
@@ -260,6 +289,7 @@ def plan_bounded_beam(
                 return (
                     int(recipe.result in state.missing),
                     _direct_yield(probe, value_limit),
+                    len(target_support.get(recipe.result, ())),
                     tuple(-part if isinstance(part, int) else part
                           for part in _recipe_order(recipe)[:2]),
                     _recipe_order(recipe),
