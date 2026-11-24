@@ -271,6 +271,67 @@ def _shared_subgraph_support(
     }
 
 
+
+def _shared_subgraph_witnesses(
+    starts: tuple[int, ...],
+    goals: frozenset[int],
+    limit: int,
+    *,
+    max_first_recipes: int = 128,
+    max_second_recipes_per_first: int = 256,
+) -> tuple[tuple[PlannedOperation, ...], ...]:
+    """Materialize bounded two-intermediate witnesses for joint target coverage.
+
+    Unlike a cone heuristic, each returned proposal contains the actual
+    dependency-bearing operations for both intermediates and every target
+    unlocked by their joint availability.
+    """
+    witnesses = []
+    start_set = set(starts)
+    first_recipes = [
+        recipe for recipe in _pair_recipes(tuple(sorted(start_set)), limit)
+        if recipe.result not in start_set and recipe.result not in goals
+    ]
+    first_recipes.sort(key=_recipe_order)
+    for first in first_recipes[:max_first_recipes]:
+        first_op = PlannedOperation(
+            first.left, first.operator, first.right, first.result, False
+        )
+        first_frontier = tuple(sorted(start_set.union((first.result,))))
+        second_recipes = [
+            recipe for recipe in _pair_recipes(first_frontier, limit)
+            if recipe.result not in first_frontier and recipe.result not in goals
+        ]
+        second_recipes.sort(key=_recipe_order)
+        for second in second_recipes[:max_second_recipes_per_first]:
+            second_op = PlannedOperation(
+                second.left, second.operator, second.right, second.result, False
+            )
+            available = tuple(sorted(set(first_frontier).union((second.result,))))
+            target_recipes = [
+                recipe for recipe in _pair_recipes(available, limit)
+                if recipe.result in goals
+            ]
+            by_target = {}
+            for recipe in target_recipes:
+                by_target.setdefault(recipe.result, recipe)
+            if not goals.issubset(by_target):
+                continue
+            target_ops = tuple(
+                PlannedOperation(
+                    by_target[target].left, by_target[target].operator,
+                    by_target[target].right, target, True,
+                )
+                for target in sorted(goals)
+            )
+            witnesses.append((first_op, second_op) + target_ops)
+    witnesses.sort(key=lambda ops: (
+        len(ops),
+        tuple((op.result, op.operator, op.left, op.right) for op in ops),
+    ))
+    return tuple(witnesses)
+
+
 def plan_bounded_beam(
     starting_values: tuple[int, ...] | list[int],
     targets: tuple[int, ...] | list[int],
@@ -329,6 +390,24 @@ def plan_bounded_beam(
     subgraph_support = _shared_subgraph_support(
         starts, initial.missing, value_limit
     )
+    # First attempt a concrete, bounded two-intermediate witness. This
+    # avoids relying on beam ranking to rediscover a known valid subgraph.
+    if initial.missing and max_intermediates >= 2 and max_depth >= 4:
+        for witness in _shared_subgraph_witnesses(
+            starts, initial.missing, value_limit
+        ):
+            if len(witness) > max_depth:
+                continue
+            try:
+                schedule_value_dag(witness, starts, value_limit)
+            except (ValueError, RuntimeError):
+                continue
+            return SharedIntermediatePlan(
+                operations=witness,
+                covered_targets=frozenset(goals),
+                missing_targets=(),
+                initial_values=frozenset(starts),
+            )
     # Keep one-step bridge values from each promising first node in the
     # expansion cone, without conflating bridge values with first-node support
     # during beam-state ranking.
