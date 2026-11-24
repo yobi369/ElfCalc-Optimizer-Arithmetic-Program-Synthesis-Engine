@@ -7,6 +7,9 @@ replayed by the VM validator before it can be used as a submission program.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from fractions import Fraction
+
+from .register_schedule import estimate_peak_live_values
 
 from .target_dna import ArithmeticRelation
 
@@ -321,10 +324,33 @@ def plan_shared_intermediates(
             if gain == 0:
                 continue
 
-            # Consume a directly reachable target before speculative
-            # intermediates: it costs one instruction and cannot be made cheaper
-            # by postponing it. Among equal classes, maximize one-step target yield.
-            rank = (int(immediate), gain, -candidate, recipe.operator, -recipe.left, -recipe.right)
+            # Compare marginal target yield against the exact instruction cost
+            # of this local fragment. A directly reachable target remains preferred:
+            # postponing it cannot reduce its one-instruction cost. Within that
+            # class, prefer better yield/cost, then lower live-value pressure.
+            fragment = [PlannedOperation(
+                recipe.left, recipe.operator, recipe.right, recipe.result, immediate
+            )]
+            fragment.extend(
+                PlannedOperation(
+                    relation.left, relation.operator, relation.right,
+                    relation.result, True,
+                )
+                for relation in unlocked
+            )
+            instruction_cost = len(fragment)
+            peak_live = estimate_peak_live_values(fragment, frontier)
+            rank = (
+                int(immediate),
+                Fraction(gain, instruction_cost),
+                gain,
+                -peak_live,
+                -instruction_cost,
+                -candidate,
+                recipe.operator,
+                -recipe.left,
+                -recipe.right,
+            )
             if best is None or rank > best[0]:
                 best = (rank, recipe, unlocked, immediate)
 
@@ -345,13 +371,33 @@ def plan_shared_intermediates(
                 alternatives.append(cooperating)
             if not alternatives:
                 break
-            # Both alternatives spend two intermediate instructions. Prefer
-            # the one that unlocks more distinct targets, then use stable
-            # recipe ordering for reproducible tie-breaking.
+            # Rank each two-intermediate fragment by target yield per
+            # instruction, then by peak live values. Both alternatives spend
+            # two intermediate instructions, but their target fan-out and
+            # dependency shape can differ substantially.
             def alternative_rank(candidate):
                 first, second, targets = candidate
+                fragment = [
+                    PlannedOperation(
+                        recipe.left, recipe.operator, recipe.right,
+                        recipe.result, False,
+                    )
+                    for recipe in (first, second)
+                ]
+                fragment.extend(
+                    PlannedOperation(
+                        recipe.left, recipe.operator, recipe.right,
+                        recipe.result, True,
+                    )
+                    for recipe in targets
+                )
+                instruction_cost = len(fragment)
+                peak_live = estimate_peak_live_values(fragment, frontier)
                 return (
+                    Fraction(len(targets), instruction_cost),
                     len(targets),
+                    -peak_live,
+                    -instruction_cost,
                     -first.result,
                     -second.result,
                     tuple(_recipe_order(recipe) for recipe in targets),
