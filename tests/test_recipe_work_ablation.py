@@ -127,6 +127,20 @@ class RecipeWorkAblationTests(TestCase):
             # Seed the ordinary beam with each motif's concrete non-target
             # dependency chain, then let the beam discover any remaining goals.
             for witness in witnesses[:4]:
+                # First preserve the motif's complete DAG: target-producing
+                # operations are part of the solution and must not be discarded.
+                try:
+                    direct_program = schedule_value_dag(witness, starts, limit)
+                except (ValueError, RuntimeError):
+                    direct_program = None
+                if direct_program is not None:
+                    direct_replay = validate_program(
+                        Puzzle(name + "_hybrid_direct", starts, targets, limit),
+                        direct_program,
+                    )
+                    if direct_replay.complete:
+                        candidates.append(witness)
+
                 prefix = tuple(op for op in witness if not op.is_target)
                 seeded_values = tuple(starts) + tuple(op.result for op in prefix)
                 remaining = tuple(
