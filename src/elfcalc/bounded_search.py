@@ -675,8 +675,13 @@ def plan_bounded_beam(
                 recipe.result for recipe in _cached_pair_recipes(frontier, value_limit)
                 if recipe.result not in frontier and recipe.result not in initial.missing
             )
+    # Target values must remain admissible under either guidance mode. When
+    # shared-subgraph guidance is enabled without reverse-cone guidance, the
+    # shared map contains first intermediates (and bridge values), not goals;
+    # omitting goals here would prune the very completions the motif predicts.
     target_cone = frozenset(
-        set(target_support).union(subgraph_support).union(subgraph_bridge_values)
+        set(initial.missing).union(target_support).union(subgraph_support)
+        .union(subgraph_bridge_values)
     )
     seen = {_state_key(initial, starts)}
 
