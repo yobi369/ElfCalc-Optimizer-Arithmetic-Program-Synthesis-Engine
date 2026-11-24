@@ -241,3 +241,16 @@ A regression fixture uses starts `(2, 5)` and target `26`: `2 / 2 = 1`, `5 × 5 
 CI passed on Python 3.10, 3.11, and 3.12 for the cooperating-intermediate implementation and its new tests.
 
 **Evidence boundary:** this adds another bounded DAG shape to the planner. It does not establish a full-dataset score improvement, and it does not prove global optimality. The 130,974 incumbent remains protected pending full exact replay and provenance review.
+
+
+## Joint evaluation of two-intermediate structures — 24 November 2026
+
+The planner no longer automatically prefers a serial two-intermediate chain whenever one exists. When the one-step frontier is exhausted, it now evaluates both:
+- a serial chain, where the second intermediate is derived from the first and an available anchor;
+- a cooperating pair, where both intermediates are independently derived from the current available frontier and jointly produce one or more missing targets.
+
+Both alternatives spend two intermediate instructions, so the planner compares their distinct target yield and applies deterministic tie-breaking. The cooperating search also excludes missing targets from the intermediate candidate set and prevents a target from being counted as an output of a pair that already contains that target as an operand. This avoids treating a required target as a speculative intermediate.
+
+Regression coverage includes a cooperating pair, intermediate-budget enforcement, and separation between target values and generated intermediates. CI passed on Python 3.10, 3.11, and 3.12.
+
+**Evidence boundary:** this is a planner-selection correctness improvement on bounded fixtures. It does not establish that either structure improves the full 1,000-puzzle objective. The protected incumbent remains 130,974 pending full exact replay and provenance review.
