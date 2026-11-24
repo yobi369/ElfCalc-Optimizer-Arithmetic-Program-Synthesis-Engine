@@ -204,12 +204,16 @@ def _best_cooperating_intermediates(
     pairs: dict[tuple[int, int], dict[int, ArithmeticRelation]] = {}
     for target in sorted(missing):
         for second in candidates:
+            if second in missing:
+                continue
             for first, target_recipe in _inverse_target_candidates(
                 target, second, limit
             ):
-                if first == second or first not in recipes_by_result:
+                if first == second or first in missing or first not in recipes_by_result:
                     continue
                 pair = tuple(sorted((first, second)))
+                if target in pair:
+                    continue
                 pairs.setdefault(pair, {}).setdefault(target, target_recipe)
 
     best = None
@@ -327,20 +331,35 @@ def plan_shared_intermediates(
         if best is None:
             if intermediate_count + 2 > max_intermediates:
                 break
+            missing_snapshot = frozenset(missing)
             chain = _best_two_intermediate_chain(
-                recipes_by_result, frontier, frozenset(missing), value_limit
+                recipes_by_result, frontier, missing_snapshot, value_limit
             )
+            cooperating = _best_cooperating_intermediates(
+                recipes_by_result, missing_snapshot, value_limit
+            )
+            alternatives = []
             if chain is not None:
-                first_recipe, bridge_recipe, target_recipes = chain
-                intermediate_recipes = (first_recipe, bridge_recipe)
-            else:
-                cooperating = _best_cooperating_intermediates(
-                    recipes_by_result, frozenset(missing), value_limit
+                alternatives.append(chain)
+            if cooperating is not None:
+                alternatives.append(cooperating)
+            if not alternatives:
+                break
+            # Both alternatives spend two intermediate instructions. Prefer
+            # the one that unlocks more distinct targets, then use stable
+            # recipe ordering for reproducible tie-breaking.
+            def alternative_rank(candidate):
+                first, second, targets = candidate
+                return (
+                    len(targets),
+                    -first.result,
+                    -second.result,
+                    tuple(_recipe_order(recipe) for recipe in targets),
                 )
-                if cooperating is None:
-                    break
-                first_recipe, bridge_recipe, target_recipes = cooperating
-                intermediate_recipes = (first_recipe, bridge_recipe)
+            first_recipe, bridge_recipe, target_recipes = max(
+                alternatives, key=alternative_rank
+            )
+            intermediate_recipes = (first_recipe, bridge_recipe)
 
             operations.extend(
                 PlannedOperation(
