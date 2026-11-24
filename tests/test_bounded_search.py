@@ -9,12 +9,38 @@ from elfcalc.bounded_search import (
     _shared_subgraph_witnesses,
     _partial_subgraph_motifs,
     _State,
+    _state_key,
     plan_bounded_beam,
 )
 from elfcalc.register_schedule import estimate_peak_live_values, schedule_value_dag
 
 
 class BoundedBeamPlannerTests(unittest.TestCase):
+    def test_state_key_preserves_distinct_recipe_provenance(self):
+        left = _State(
+            operations=(
+                __import__("elfcalc.shared_intermediate", fromlist=["PlannedOperation"]).PlannedOperation(
+                    2, "+", 2, 4, False
+                ),
+            ),
+            available=frozenset({2, 3, 4}),
+            missing=frozenset({10}),
+            intermediates=1,
+        )
+        right = _State(
+            operations=(
+                __import__("elfcalc.shared_intermediate", fromlist=["PlannedOperation"]).PlannedOperation(
+                    2, "*", 2, 4, False
+                ),
+            ),
+            available=frozenset({2, 3, 4}),
+            missing=frozenset({10}),
+            intermediates=1,
+        )
+        self.assertEqual(len(left.operations), len(right.operations))
+        self.assertEqual(left.available, right.available)
+        self.assertNotEqual(_state_key(left, (2, 3)), _state_key(right, (2, 3)))
+
     def test_finds_three_intermediate_power_chain(self):
         # 2 -> 4 -> 16 -> 256 -> 65536.
         plan = plan_bounded_beam(
