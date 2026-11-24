@@ -117,3 +117,15 @@ The planner compares these partial proposals against its best incomplete beam st
 The experimental planner now exposes independent switches for complete-witness proposals and partial-yield motif proposals. This permits synthetic comparisons among beam-only, beam plus complete witnesses, and beam plus partial motifs while holding the beam width, depth, intermediate budget, and per-state expansion cap constant. A regression test runs all three modes on the same 2,3 → {12,18,99} fixture and validates every returned plan through the register scheduler and VM replay.
 
 The planner exposes shared motif-search caps (`motif_state_budget`, `motif_recipe_budget`, and `motif_result_budget`) so both auxiliary methods can be run under identical declared state, branching, and retained-result limits. The regression fixture uses 128 states, 16 recipes per state, and 16 retained results for either auxiliary method, alongside identical beam limits. This is still not a fully equal wall-clock or primitive-operation budget: candidate generation and scoring costs differ by method. Results must therefore be reported with that caveat. The test asserts correctness and coverage accounting, not that one strategy always wins. No competition archive was used.
+
+### First synthetic comparison results (2026-11-24)
+
+The controlled comparison now covers two fixtures, all three strategies, and Python 3.10/3.11/3.12 CI environments. All plans were register-scheduled and VM-replayed.
+
+**Fixture A — shared factor:** starts `(2, 3)`, targets `(12, 18, 99)`, depth 3, one intermediate. All three strategies covered 2/3 targets in 3 instructions with peak-live 2. This fixture is not discriminative: the ordinary beam already discovers the useful factor 6.
+
+**Fixture B — two-stage bridge:** starts `(2, 3)`, targets `(12, 35)`, depth 4, two intermediates. The ordinary beam covered 1/2 targets in 2 instructions (peak-live 1). Both complete-witness and partial-motif search covered 2/2 in 4 instructions (peak-live 2), using the shared bridge `2+3=5`, `5+2=7`, then `5+7=12` and `5*7=35`. The regression test now locks in this coverage distinction.
+
+Wall-clock observations for Fixture B varied by CI interpreter/runner: approximately 1.14–2.59 seconds per strategy. Complete-witness was marginally faster than partial-motif in these three runs, but the difference is too small and environment-sensitive to support a speed claim. The meaningful result is coverage: the motif searches recover the second target that beam-only misses under these declared limits.
+
+**Interpretation:** complete-witness and partial-motif both help on this deliberately constructed shared-bridge case. Partial-motif search has not yet demonstrated an advantage over complete-witness search on this fixture. The next experiment should target partial motifs that unlock useful subsets when no bounded complete witness exists, and compare several structurally distinct synthetic families. These results are synthetic only; they do not establish improvement on the Kaggle puzzle set or justify production integration.
