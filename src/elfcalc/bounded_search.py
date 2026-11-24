@@ -265,11 +265,6 @@ def _shared_subgraph_support(
                 break
         if unlocked:
             support[first.result] = unlocked
-            # Keep bridge nodes inside the candidate cone as well. Otherwise
-            # a nonempty reverse cone can prune the exact second node needed
-            # to realize the shared subgraph before the fallback is considered.
-            for bridge in bridge_values:
-                support.setdefault(bridge, set()).update(unlocked)
     return {
         value: frozenset(targets)
         for value, targets in sorted(support.items())
@@ -334,7 +329,19 @@ def plan_bounded_beam(
     subgraph_support = _shared_subgraph_support(
         starts, initial.missing, value_limit
     )
-    target_cone = frozenset(set(target_support).union(subgraph_support))
+    # Keep one-step bridge values from each promising first node in the
+    # expansion cone, without conflating bridge values with first-node support
+    # during beam-state ranking.
+    subgraph_bridge_values: set[int] = set()
+    for first in subgraph_support:
+        frontier = tuple(sorted(set(starts).union((first,))))
+        subgraph_bridge_values.update(
+            recipe.result for recipe in _pair_recipes(frontier, value_limit)
+            if recipe.result not in frontier and recipe.result not in initial.missing
+        )
+    target_cone = frozenset(
+        set(target_support).union(subgraph_support).union(subgraph_bridge_values)
+    )
     seen = {_state_key(initial, starts)}
 
     for _depth in range(max_depth):
@@ -385,8 +392,8 @@ def plan_bounded_beam(
                         state, recipe.result, value_limit, subgraph_support
                     ),
                     _direct_yield(probe, value_limit),
-                    len(target_support.get(recipe.result, ())),
                     len(subgraph_support.get(recipe.result, ())),
+                    len(target_support.get(recipe.result, ())),
                     tuple(-part if isinstance(part, int) else part
                           for part in _recipe_order(recipe)[:2]),
                     _recipe_order(recipe),
