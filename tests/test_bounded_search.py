@@ -13,13 +13,14 @@ from elfcalc.bounded_search import (
     plan_bounded_beam,
 )
 from elfcalc.register_schedule import estimate_peak_live_values, schedule_value_dag
+from elfcalc.shared_intermediate import PlannedOperation
 
 
 class BoundedBeamPlannerTests(unittest.TestCase):
     def test_state_key_preserves_distinct_recipe_provenance(self):
         left = _State(
             operations=(
-                __import__("elfcalc.shared_intermediate", fromlist=["PlannedOperation"]).PlannedOperation(
+                PlannedOperation(
                     2, "+", 2, 4, False
                 ),
             ),
