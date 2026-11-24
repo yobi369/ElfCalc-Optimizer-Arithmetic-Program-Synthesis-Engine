@@ -316,6 +316,16 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         self.assertIn(6, {op.result for op in operations})
         self.assertTrue(schedule_value_dag(operations, starts, 1000))
 
+        plan = plan_bounded_beam(
+            starts, sorted(goals), 1000,
+            max_intermediates=1, max_depth=5, beam_width=32,
+            enable_complete_witnesses=False,
+            enable_partial_motifs=True,
+        )
+        self.assertEqual(set(plan.covered_targets), {10, 12, 15, 18})
+        self.assertEqual(set(plan.missing_targets), {99})
+        self.assertTrue(schedule_value_dag(plan.operations, starts, 1000))
+
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
