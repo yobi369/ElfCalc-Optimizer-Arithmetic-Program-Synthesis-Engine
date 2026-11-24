@@ -97,3 +97,11 @@ https://github.com/yobi369/ElfCalc-Optimizer-Arithmetic-Program-Synthesis-Engine
 The witness path now retains a bounded set of concrete two-intermediate proposals (up to 64) instead of returning the first schedulable proposal. Each candidate must pass register scheduling and local VM replay. Verified proposals are ranked by instruction count, estimated peak live values, and a deterministic structural tie-break. This creates an explicit cost-versus-register-pressure selection point while preserving reproducibility. The witness enumeration remains capped at 128 first recipes and 256 second recipes per first recipe; reaching the witness cap stops enumeration, so this is not an exhaustive search or global optimum proof.
 
 A regression test checks that the 2,3 -> 5,7 -> 12,35 witness is concrete, deterministic, and accepted by the scheduler/VM replay.
+
+## Bounded multi-stage motif witnesses
+
+The concrete witness constructor has been generalized from exactly two intermediates to a bounded deterministic depth-first value-DAG search. It grows one non-target intermediate at a time, checks after each stage whether the currently available values jointly expose all missing goals, and caps branching at 128 recipes per state, total visited states at 4,096, and retained witnesses at 64. The planner derives the intermediate budget from both the caller's intermediate limit and remaining instruction depth after reserving one final instruction per missing target.
+
+Every returned witness is still passed through the register scheduler and exact local VM replay. Verified alternatives are ranked by instruction count, estimated peak live values, and deterministic structure. A regression fixture uses starts 2 and 3 to build 5, 25, and 125, then unlocks targets 250 and 375. A two-intermediate search is expected not to find that fixture; a three-intermediate search must.
+
+This expands the bounded motif horizon; it does not make the search complete, globally optimal, or suitable for production integration without further benchmarking.
