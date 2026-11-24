@@ -254,3 +254,12 @@ Both alternatives spend two intermediate instructions, so the planner compares t
 Regression coverage includes a cooperating pair, intermediate-budget enforcement, and separation between target values and generated intermediates. CI passed on Python 3.10, 3.11, and 3.12.
 
 **Evidence boundary:** this is a planner-selection correctness improvement on bounded fixtures. It does not establish that either structure improves the full 1,000-puzzle objective. The protected incumbent remains 130,974 pending full exact replay and provenance review.
+
+
+## Cost-aware DAG selection research — 24 November 2026
+
+A follow-on design specification now defines how to compare complete candidate fragments by target yield, instruction cost, speculative intermediate count, estimated peak live values, and intermediate reuse. It proposes Pareto filtering followed by deterministic bounded selection, with the existing register scheduler and VM replay retained as final correctness gates.
+
+See [COST-AWARE-DAG-SELECTION.md](COST-AWARE-DAG-SELECTION.md).
+
+**Evidence boundary:** this is a design artifact only. No cost-aware implementation or full-dataset benchmark is claimed. The 130,974-instruction incumbent remains unchanged.
