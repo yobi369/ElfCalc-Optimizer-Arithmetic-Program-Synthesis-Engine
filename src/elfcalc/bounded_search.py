@@ -193,6 +193,51 @@ def _pareto_by_coverage(
     return tuple(kept)
 
 
+
+def _shared_subgraph_support(
+    starts: tuple[int, ...],
+    goals: frozenset[int],
+    limit: int,
+    *,
+    max_first_recipes: int = 128,
+    max_second_recipes_per_first: int = 256,
+) -> dict[int, frozenset[int]]:
+    """Find first nodes of bounded two-intermediate DAGs that unlock goals.
+
+    For each first recipe from the actual starting frontier, enumerate a
+    capped second frontier using that first result, then measure which goals
+    become one operation away. The returned support is a look-ahead heuristic:
+    it does not claim the second node is already available to the beam.
+    """
+    support: dict[int, set[int]] = {}
+    first_recipes = [
+        recipe for recipe in _pair_recipes(tuple(sorted(set(starts))), limit)
+        if recipe.result not in starts and recipe.result not in goals
+    ]
+    first_recipes.sort(key=_recipe_order)
+    for first in first_recipes[:max_first_recipes]:
+        second_frontier = tuple(sorted(set(starts).union((first.result,))))
+        second_recipes = [
+            recipe for recipe in _pair_recipes(second_frontier, limit)
+            if recipe.result not in second_frontier and recipe.result not in goals
+        ]
+        second_recipes.sort(key=_recipe_order)
+        unlocked: set[int] = set()
+        for second in second_recipes[:max_second_recipes_per_first]:
+            available = tuple(sorted(set(second_frontier).union((second.result,))))
+            for target_recipe in _pair_recipes(available, limit):
+                if target_recipe.result in goals:
+                    unlocked.add(target_recipe.result)
+            if len(unlocked) == len(goals):
+                break
+        if unlocked:
+            support[first.result] = unlocked
+    return {
+        value: frozenset(targets)
+        for value, targets in sorted(support.items())
+    }
+
+
 def plan_bounded_beam(
     starting_values: tuple[int, ...] | list[int],
     targets: tuple[int, ...] | list[int],
@@ -246,6 +291,12 @@ def plan_bounded_beam(
         initial.missing, anchor_pool, value_limit, max_depth, 1024
     )
     target_cone = frozenset(target_support)
+    # A second, bounded look-ahead detects two-node shared subgraphs. Unlike
+    # reverse-cone support, this explicitly asks whether a first intermediate
+    # can lead to a second intermediate that jointly exposes several goals.
+    subgraph_support = _shared_subgraph_support(
+        starts, initial.missing, value_limit
+    )
     seen = {_state_key(initial, starts)}
 
     for _depth in range(max_depth):
@@ -290,6 +341,7 @@ def plan_bounded_beam(
                     int(recipe.result in state.missing),
                     _direct_yield(probe, value_limit),
                     len(target_support.get(recipe.result, ())),
+                    len(subgraph_support.get(recipe.result, ())),
                     tuple(-part if isinstance(part, int) else part
                           for part in _recipe_order(recipe)[:2]),
                     _recipe_order(recipe),
