@@ -193,6 +193,52 @@ class BoundedBeamPlannerTests(unittest.TestCase):
             common["max_depth"],
         )
 
+    def test_strategy_comparison_on_two_stage_shared_bridge(self):
+        # The 5 -> 7 bridge jointly unlocks 12 and 35:
+        # 2+3=5, 5+2=7, 5+7=12, 5*7=35.
+        common = dict(
+            max_intermediates=2,
+            max_depth=4,
+            beam_width=24,
+            max_expansions_per_state=32,
+            motif_state_budget=256,
+            motif_recipe_budget=24,
+            motif_result_budget=24,
+        )
+        modes = {}
+        elapsed = {}
+
+        def run_mode(name, **flags):
+            started = perf_counter()
+            modes[name] = plan_bounded_beam(
+                [2, 3], [12, 35], 1000, **flags, **common
+            )
+            elapsed[name] = perf_counter() - started
+
+        run_mode("beam_only", enable_complete_witnesses=False,
+                 enable_partial_motifs=False)
+        run_mode("complete_witness", enable_complete_witnesses=True,
+                 enable_partial_motifs=False)
+        run_mode("partial_motif", enable_complete_witnesses=False,
+                 enable_partial_motifs=True)
+
+        metrics = {}
+        for name, plan in modes.items():
+            self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
+            self.assertEqual(
+                set(plan.covered_targets).union(plan.missing_targets),
+                {12, 35},
+            )
+            metrics[name] = {
+                "coverage": len(plan.covered_targets),
+                "instructions": len(plan.operations),
+                "peak_live": estimate_peak_live_values(plan.operations, [2, 3]),
+                "elapsed_seconds": elapsed[name],
+            }
+        print("SHARED_BRIDGE_STRATEGY_METRICS", metrics)
+        self.assertEqual(metrics["complete_witness"]["coverage"], 2)
+        self.assertEqual(metrics["partial_motif"]["coverage"], 2)
+
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
