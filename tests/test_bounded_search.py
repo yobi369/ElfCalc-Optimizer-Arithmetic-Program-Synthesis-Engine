@@ -326,6 +326,51 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         self.assertEqual(set(plan.missing_targets), {99})
         self.assertTrue(schedule_value_dag(plan.operations, starts, 1000))
 
+    def test_multi_family_partial_motif_strategy_comparison(self):
+        starts = [2, 3, 5]
+        goals = [10, 12, 15, 18, 99]
+        common = dict(
+            max_intermediates=1,
+            max_depth=5,
+            beam_width=32,
+            max_expansions_per_state=64,
+            motif_state_budget=4096,
+            motif_recipe_budget=128,
+            motif_result_budget=64,
+        )
+        modes = {}
+        elapsed = {}
+
+        def run_mode(name, **flags):
+            started = perf_counter()
+            modes[name] = plan_bounded_beam(
+                starts, goals, 1000, **flags, **common
+            )
+            elapsed[name] = perf_counter() - started
+
+        run_mode("beam_only", enable_complete_witnesses=False,
+                 enable_partial_motifs=False)
+        run_mode("complete_witness", enable_complete_witnesses=True,
+                 enable_partial_motifs=False)
+        run_mode("partial_motif", enable_complete_witnesses=False,
+                 enable_partial_motifs=True)
+
+        metrics = {}
+        for name, plan in modes.items():
+            self.assertTrue(schedule_value_dag(plan.operations, starts, 1000))
+            self.assertEqual(
+                set(plan.covered_targets).union(plan.missing_targets),
+                set(goals),
+            )
+            metrics[name] = {
+                "coverage": len(plan.covered_targets),
+                "instructions": len(plan.operations),
+                "peak_live": estimate_peak_live_values(plan.operations, starts),
+                "elapsed_seconds": elapsed[name],
+            }
+        print("MULTI_FAMILY_STRATEGY_METRICS", metrics)
+        self.assertEqual(metrics["partial_motif"]["coverage"], 4)
+
     def test_partial_motifs_rank_target_yield_per_instruction(self):
         candidates = _partial_subgraph_motifs(
             (2, 3), frozenset({12, 18, 99}), 1000,
