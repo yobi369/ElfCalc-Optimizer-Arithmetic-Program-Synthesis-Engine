@@ -254,15 +254,22 @@ def _shared_subgraph_support(
         ]
         second_recipes.sort(key=_recipe_order)
         unlocked: set[int] = set()
+        bridge_values: set[int] = set()
         for second in second_recipes[:max_second_recipes_per_first]:
             available = tuple(sorted(set(second_frontier).union((second.result,))))
             for target_recipe in _pair_recipes(available, limit):
                 if target_recipe.result in goals:
                     unlocked.add(target_recipe.result)
+                    bridge_values.add(second.result)
             if len(unlocked) == len(goals):
                 break
         if unlocked:
             support[first.result] = unlocked
+            # Keep bridge nodes inside the candidate cone as well. Otherwise
+            # a nonempty reverse cone can prune the exact second node needed
+            # to realize the shared subgraph before the fallback is considered.
+            for bridge in bridge_values:
+                support.setdefault(bridge, set()).update(unlocked)
     return {
         value: frozenset(targets)
         for value, targets in sorted(support.items())
@@ -321,7 +328,7 @@ def plan_bounded_beam(
     target_support = _multi_target_cone_support(
         initial.missing, anchor_pool, value_limit, max_depth, 1024
     )
-    target_cone = frozenset(target_support)
+    target_cone = frozenset(set(target_support).union(subgraph_support))
     # A second, bounded look-ahead detects two-node shared subgraphs. Unlike
     # reverse-cone support, this explicitly asks whether a first intermediate
     # can lead to a second intermediate that jointly exposes several goals.
