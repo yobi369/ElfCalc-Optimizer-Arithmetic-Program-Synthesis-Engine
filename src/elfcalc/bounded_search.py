@@ -151,6 +151,27 @@ def _multi_target_cone_support(
     }
 
 
+
+def _shared_completion_yield(
+    state: _State,
+    candidate: int,
+    limit: int,
+    subgraph_support: dict[int, frozenset[int]],
+) -> int:
+    """Count supported goals exposed by adding a second node to a known prefix."""
+    supported_goals: set[int] = set()
+    for first in state.available:
+        supported_goals.update(subgraph_support.get(first, ()))
+    if not supported_goals:
+        return 0
+    available = tuple(sorted(state.available.union((candidate,))))
+    return len({
+        recipe.result
+        for recipe in _pair_recipes(available, limit)
+        if recipe.result in state.missing and recipe.result in supported_goals
+    })
+
+
 def _rank(
     state: _State,
     starts: tuple[int, ...],
@@ -347,8 +368,15 @@ def plan_bounded_beam(
                     state.operations, frozenset(next_available),
                     state.missing.difference((recipe.result,)), state.intermediates,
                 )
+                # Once a promising first node is present, explicitly score
+                # candidate bridge nodes by the number of its supported goals
+                # that become reachable. This prevents the beam from retaining
+                # the prefix while pruning the bridge needed to complete it.
                 return (
                     int(recipe.result in state.missing),
+                    _shared_completion_yield(
+                        state, recipe.result, value_limit, subgraph_support
+                    ),
                     _direct_yield(probe, value_limit),
                     len(target_support.get(recipe.result, ())),
                     len(subgraph_support.get(recipe.result, ())),
