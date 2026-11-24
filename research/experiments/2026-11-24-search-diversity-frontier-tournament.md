@@ -38,10 +38,15 @@ survive, while caching changes the cost of obtaining a recipe frontier.
 
 candidate_state_proposals counts child-state key evaluations; it is not the
 number of states fully expanded. frontier_requests counts requests for
-one-step recipe lists. frontiers_generated counts actual calls to the underlying recipe generator, including cache misses. The cache-enabled wrapper is instrumented beneath the LRU cache so cache hits are not miscounted as generations. Wall-clock time is descriptive and runner-sensitive.
+one-step recipe lists. frontiers_generated counts actual calls to the underlying
+recipe generator, including cache misses. The cache-enabled wrapper is
+instrumented beneath the LRU cache so cache hits are not miscounted as
+generations. Wall-clock time is descriptive and runner-sensitive.
 
-The test asserts that cache on/off cannot change deterministic plan quality and that caching does not increase actual frontier generation. It prints the full result matrix for CI logs. Timing comparisons should be
-repeated on the same machine before drawing performance conclusions.
+The test asserts that cache on/off cannot change deterministic plan quality and
+that caching does not increase actual frontier generation. It prints the full
+result matrix for CI logs. Timing comparisons should be repeated on the same
+machine before drawing performance conclusions.
 
 ## Interpretation gates
 
@@ -53,20 +58,62 @@ repeated on the same machine before drawing performance conclusions.
   stable-machine runtime without changing results.
 - No strategy is promoted based on diversity counts alone.
 
-## Initial CI result and interpretation
+## Initial tournament result
 
 CI run 45348542333 passed on Python 3.10, 3.11, and 3.12. Its initial counters
 showed caching reduced measured frontier generations to zero, but code review
 found that the counter was not instrumented beneath the cache. That measurement
-is therefore invalid and is being corrected before drawing any caching conclusion.
+is invalid and was corrected before drawing any caching conclusion.
 
 On the four initial fixtures, diversity reservation did not improve coverage,
 instruction count, or peak-live pressure over provenance-only admission. In
 the provenance-collision fixture, provenance-aware search retained a more
-expensive proposal (5 rather than 4 instructions) at the same coverage. This is
-a useful warning: preserving provenance can increase search cost without
-helping every instance. These small fixtures do not establish a general result.
+expensive proposal (5 rather than 4 instructions) at the same coverage. This
+is a useful warning: preserving provenance can increase search cost without
+helping every instance.
 
-This is synthetic-only research. It does not inspect the competition archive,
-change the production solver, alter the frozen 130,974-instruction incumbent,
-or submit to Kaggle.
+## Real-planner end-to-end ablation
+
+A second test invokes the actual `plan_bounded_beam` entry point twice per
+fixture. It switches only the beam-admission selector: ordinary global-rank
+selection versus the production diversity selector. Provenance-aware state
+identity, Pareto filtering, target-cone guidance, and the declared search
+limits remain active in both arms. Complete-witness and partial-motif searches
+are disabled. Both arms are checked by register scheduling and exact VM
+validation for all covered targets.
+
+CI run 45353027624 passed on Python 3.10, 3.11, and 3.12. The Python 3.11 log
+recorded these metrics as (covered targets, instruction count, peak live,
+missing targets):
+
+| Synthetic family | Ordinary admission | Diversity reservation |
+|---|---:|---:|
+| shared_factor | (3, 5, 2, none) | (3, 5, 2, none) |
+| shared_bridge | (2, 5, 2, none) | (2, 5, 2, none) |
+| multi_family | (4, 5, 2, 99) | (4, 5, 2, 99) |
+| provenance_collision | (2, 5, 2, 35) | (2, 5, 2, 35) |
+| deep_power | (1, 3, 1, none) | (1, 3, 1, none) |
+
+**Result:** diversity reservation produced no quality improvement on any of
+these five end-to-end fixtures. It also did not degrade the measured solution
+quality. This is a neutral result, not evidence that diversity is generally
+beneficial. The earlier adversarial unit tests establish that reservation can
+preserve a branch with a valid multi-step completion that ordinary top-k
+selection discards, but that constructed mechanism has not translated into
+better output on these naturally ranked planner fixtures.
+
+## Decision and next experiment
+
+Do not promote diversity reservation into the production solver on this
+evidence. Keep it experimental. The next useful test is an adaptive selector:
+reserve a distinct-root slot only when the current top-ranked beam is
+structurally concentrated and the candidate alternative has demonstrable
+multi-step target support. Compare ordinary, always-diverse, and adaptive
+admission under the same declared budget on a broader deterministic synthetic
+fixture bank. Measure coverage, instruction count, peak-live pressure, state
+proposals, frontier generations, and runtime. The adaptive policy must show
+a repeatable quality gain before it is considered for production.
+
+This remains synthetic-only research. The competition archive has not been
+re-inspected, the frozen 130,974-instruction incumbent is unchanged, and no
+Kaggle submission has been made.
