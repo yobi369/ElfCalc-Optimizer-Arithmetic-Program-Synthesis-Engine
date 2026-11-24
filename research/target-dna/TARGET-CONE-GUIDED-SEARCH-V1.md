@@ -69,3 +69,10 @@ The beam now builds a separate bounded reverse cone for each missing target and 
 ## Score integrity
 
 No new full-dataset score is claimed. No Kaggle submission has been made. The frozen incumbent remains 130,974 instructions.
+
+
+## Two-node shared-subgraph look-ahead
+
+The bounded beam now computes a deterministic, capped look-ahead over two-intermediate DAG fragments from the actual starting frontier. It scores a first intermediate by the number of missing targets that become directly reachable after a legal second intermediate. This is separate from the reverse-cone signal: it explicitly preserves the relationship between the first node, a second bridge node, and the jointly exposed targets.
+
+Synthetic fixture: starts 2 and 3 produce 5, then 7; the pair 5 and 7 produces both 12 and 35. Tests assert the support attribution and require the beam's completed plan to pass the register scheduler and VM replay. The helper is capped at 128 first recipes and 256 second recipes per first recipe. It remains a heuristic and is not integrated into the production solver or evaluated on the scored archive.
