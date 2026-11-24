@@ -117,3 +117,65 @@ a repeatable quality gain before it is considered for production.
 This remains synthetic-only research. The competition archive has not been
 re-inspected, the frozen 130,974-instruction incumbent is unchanged, and no
 Kaggle submission has been made.
+
+
+## Adaptive admission ablation
+
+The adaptive selector begins with ordinary global-rank admission. It intervenes
+only if the selected beam contains duplicate first-recipe roots and an excluded
+distinct-root state has strictly greater immediate target yield than the
+weakest selected state. It replaces only that weakest state. This is a bounded
+heuristic; immediate yield is not a proof of future solvability.
+
+CI run 45353886026 passed all 111 tests on Python 3.10, 3.11, and 3.12. Its
+end-to-end synthetic ablation produced identical quality metrics for ordinary,
+always-diverse, and adaptive admission:
+
+| Synthetic family | Coverage | Instructions | Peak live |
+|---|---:|---:|---:|
+| shared_factor | 2 | 3 | 2 |
+| shared_bridge | 1 | 2 | 1 |
+| multi_family | 4 | 5 | 2 |
+| provenance_collision | 2 | 5 | 2 |
+
+All three policies matched on every family. The adversarial selector test
+continues to show the intended branch-preservation mechanism, but the broader
+synthetic results provide no evidence of a natural quality advantage. Keep
+both diversity policies experimental; ordinary admission remains the
+recommended default absent stronger evidence.
+
+## Corrected cache economics observations
+
+The corrected tournament's CI log also shows that the 256-entry LRU frontier
+cache substantially reduces actual recipe-frontier generation while
+preserving quality. Selected examples:
+
+| Family / strategy | Cache off: generations | Cache on: generations | Reduction |
+|---|---:|---:|---:|
+| shared_factor / original-style | 423 | 67 | 84.2% |
+| shared_bridge / original-style | 1,038 | 201 | 80.6% |
+| multi_family / original-style | 5,587 | 1,312 | 76.5% |
+| multi_family / provenance | 5,948 | 731 | 87.7% |
+| provenance_collision / provenance | 2,070 | 250 | 87.9% |
+
+These are synthetic fixture counts, not competition-scale measurements.
+Wall-clock improvements are smaller and runner-dependent; the evidence
+supports caching as a reduction in repeated frontier construction, not a claim
+of equivalent end-to-end speedup. Cache hits, misses, and evictions were not
+yet recorded as a full memory/working-set profile.
+
+## Next experiment: cache working-set economics
+
+Hold the search policy fixed and compare cache capacities 0 (disabled), 32,
+64, 128, 256, 512, and 1,024 on a larger deterministic synthetic fixture
+bank. Record cache hit/miss/current-size statistics, actual frontier
+generations, elapsed time, and peak memory if a reliable measurement is
+available. Repeat fixtures in a fixed order and reverse order to expose order
+sensitivity. Every capacity must produce identical plan-quality metrics and
+exact VM replay. The aim is to identify the smallest cache that captures most
+reusable work without unnecessary memory retention. No production change
+until the measured working-set curve justifies it.
+
+The competition archive remains uninspected in this research phase. The
+130,974-instruction incumbent remains frozen, and no Kaggle submission has
+been made.
