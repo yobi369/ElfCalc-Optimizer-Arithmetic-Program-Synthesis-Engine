@@ -3,6 +3,7 @@ import unittest
 from elfcalc.bounded_search import (
     _backward_target_cone,
     _forward_anchor_pool,
+    _multi_target_cone_support,
     plan_bounded_beam,
 )
 from elfcalc.register_schedule import schedule_value_dag
@@ -47,6 +48,20 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         )
         self.assertIn(21, quotient)
         self.assertIn(3, quotient)
+
+    def test_multi_target_cone_identifies_shared_intermediate(self):
+        # 6 can unlock 12 via 6*2 and 18 via 6*3.
+        support = _multi_target_cone_support(
+            frozenset({12, 18}), (2, 3), 1000, 1, 128
+        )
+        self.assertEqual(support[6], frozenset({12, 18}))
+
+    def test_multi_target_cone_is_deterministic(self):
+        args = (frozenset({12, 18, 24}), (2, 3), 1000, 2, 128)
+        self.assertEqual(
+            _multi_target_cone_support(*args),
+            _multi_target_cone_support(*args),
+        )
 
     def test_reverse_cone_is_bounded_and_deterministic(self):
         anchors = _forward_anchor_pool((2, 3), 1000, 3, 128)
