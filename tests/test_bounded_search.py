@@ -1,6 +1,7 @@
 import unittest
 
 from elfcalc.bounded_search import plan_bounded_beam
+from elfcalc.register_schedule import schedule_value_dag
 
 
 class BoundedBeamPlannerTests(unittest.TestCase):
@@ -13,6 +14,9 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         self.assertEqual(plan.missing_targets, ())
         self.assertEqual(plan.intermediate_count, 3)
         self.assertEqual(plan.operations[-1].result, 65536)
+        # The planner itself now requires the same register allocator and VM
+        # replay used by the production lowering path.
+        self.assertTrue(schedule_value_dag(plan.operations, [2], 100000))
 
     def test_respects_intermediate_budget(self):
         plan = plan_bounded_beam(
@@ -27,6 +31,10 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         first = plan_bounded_beam(*args, max_depth=3, beam_width=12)
         second = plan_bounded_beam(*args, max_depth=3, beam_width=12)
         self.assertEqual(first, second)
+
+    def test_rejects_invalid_value_limit(self):
+        with self.assertRaises(ValueError):
+            plan_bounded_beam([2], [4], 0)
 
     def test_initial_target_needs_no_operations(self):
         plan = plan_bounded_beam([2, 3], [2, 3], 20)
