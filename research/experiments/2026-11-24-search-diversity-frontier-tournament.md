@@ -269,3 +269,70 @@ Keep it experimental until it improves more than adversarial hand-built cases.
 The competition archive remains uninspected in this research phase. The
 130,974-instruction incumbent remains frozen, and no Kaggle submission has
 been made.
+
+
+## Target-cone × shared-subgraph guidance factorial ablation
+
+The first five-fixture factorial run (run 45406139105, Python 3.10/3.11/3.12)
+executed all four guidance arms under identical declared limits:
+- max intermediates: 3
+- max depth: 5
+- beam width: 8
+- max expansions per state: 16
+- complete-witness and partial-motif side searches disabled
+
+Every plan was register-scheduled and exact-VM replayed for the targets it
+claimed to cover. The factorial test itself completed; the overall workflow
+failed only because a separate focused test required a width-1, one-expansion
+beam to find both shared-bridge targets. The broad factorial experiment showed
+that shared-subgraph-only guidance did find both targets under the common
+limits. That focused test has been aligned to the common limits; its corrected
+cross-version run is pending (run 45408352570).
+
+Measured results from the factorial test:
+
+| Fixture | Guidance arm | Targets covered | Instructions | Peak live | Frontiers generated |
+|---|---|---:|---:|---:|---:|
+| shared_factor | unguided | 3/3 | 5 | 2 | 369 |
+| shared_factor | target-cone only | 3/3 | 5 | 2 | 373 |
+| shared_factor | shared-subgraph only | 3/3 | 5 | 2 | 192 |
+| shared_factor | combined | 3/3 | 5 | 2 | 383 |
+| shared_bridge | unguided | 2/2 | 5 | 2 | 204 |
+| shared_bridge | target-cone only | 2/2 | 5 | 2 | 208 |
+| shared_bridge | shared-subgraph only | 2/2 | 5 | 2 | 134 |
+| shared_bridge | combined | 2/2 | 5 | 2 | 209 |
+| deep_shared_bridge | unguided | 1/3 | 4 | 2 | 161 |
+| deep_shared_bridge | target-cone only | 1/3 | 4 | 2 | 165 |
+| deep_shared_bridge | shared-subgraph only | 1/3 | 4 | 2 | 123 |
+| deep_shared_bridge | combined | 1/3 | 4 | 2 | 187 |
+| multi_family | unguided | 4/5 | 5 | 2 | 685 |
+| multi_family | target-cone only | 4/5 | 5 | 2 | 688 |
+| multi_family | shared-subgraph only | 4/5 | 5 | 2 | 454 |
+| multi_family | combined | 4/5 | 5 | 2 | 672 |
+| overlapping_cones | unguided | 5/8 | 5 | 3 | 1,091 |
+| overlapping_cones | target-cone only | 5/8 | 5 | 3 | 1,094 |
+| overlapping_cones | shared-subgraph only | 5/8 | 5 | 3 | 806 |
+| overlapping_cones | combined | 5/8 | 5 | 3 | 1,113 |
+
+Interpretation:
+- Neither target-cone nor shared-subgraph guidance improved target coverage,
+  instruction count, or peak-live pressure over unguided search on these five
+  fixtures.
+- Shared-subgraph-only guidance reduced generated recipe frontiers in all
+  five fixtures (about 17% to 34% fewer than unguided), but did not improve
+  arithmetic output quality. This is a search-work reduction, not a better
+  solution.
+- Combining the two signals generally increased frontier generation and did
+  not improve coverage or program size. The signals are not additive in this
+  implementation.
+- The deep_shared_bridge fixture remains difficult for all four modes: each
+  covers only 75 of targets 50, 75, and 99. This suggests the current signals
+  do not adequately direct multi-step synthesis toward the missing 50 and 99.
+
+**Decision:** keep both signals experimental. Shared-subgraph guidance is a
+promising frontier-pruning signal, but there is no evidence yet that it finds
+better programs. The next arithmetic-quality experiment should test a
+completion-aware motif proposal: when a shared intermediate exposes an exact
+target recipe, reserve a bounded expansion for the entire dependency chain,
+not merely the first shared value. Compare that against the same unguided
+beam and identical total expansion budget, then replay every result exactly.
