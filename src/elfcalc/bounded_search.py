@@ -570,6 +570,8 @@ def plan_bounded_beam(
     motif_state_budget: int = 4096,
     motif_recipe_budget: int = 128,
     motif_result_budget: int = 64,
+    enable_target_cone_guidance: bool = True,
+    enable_shared_subgraph_guidance: bool = True,
 ) -> SharedIntermediatePlan:
     """Search a bounded beam of partial arithmetic DAGs.
 
@@ -612,15 +614,22 @@ def plan_bounded_beam(
     # Reverse target equations are joined only against a bounded forward
     # closure from the initial registers. This gives the beam a target-directed
     # candidate filter without making the search complete or unbounded.
-    anchor_pool = _forward_anchor_pool(starts, value_limit, max_depth, 512)
-    target_support = _multi_target_cone_support(
-        initial.missing, anchor_pool, value_limit, max_depth, 1024
+    anchor_pool = (
+        _forward_anchor_pool(starts, value_limit, max_depth, 512)
+        if enable_target_cone_guidance else ()
+    )
+    target_support = (
+        _multi_target_cone_support(
+            initial.missing, anchor_pool, value_limit, max_depth, 1024
+        )
+        if enable_target_cone_guidance else {}
     )
     # A second, bounded look-ahead detects two-node shared subgraphs. Unlike
     # reverse-cone support, this explicitly asks whether a first intermediate
     # can lead to a second intermediate that jointly exposes several goals.
-    subgraph_support = _shared_subgraph_support(
-        starts, initial.missing, value_limit
+    subgraph_support = (
+        _shared_subgraph_support(starts, initial.missing, value_limit)
+        if enable_shared_subgraph_guidance else {}
     )
     # First attempt a concrete, bounded two-intermediate witness. This
     # avoids relying on beam ranking to rediscover a known valid subgraph.
@@ -659,12 +668,13 @@ def plan_bounded_beam(
     # expansion cone, without conflating bridge values with first-node support
     # during beam-state ranking.
     subgraph_bridge_values: set[int] = set()
-    for first in subgraph_support:
-        frontier = tuple(sorted(set(starts).union((first,))))
-        subgraph_bridge_values.update(
-            recipe.result for recipe in _cached_pair_recipes(frontier, value_limit)
-            if recipe.result not in frontier and recipe.result not in initial.missing
-        )
+    if enable_shared_subgraph_guidance:
+        for first in subgraph_support:
+            frontier = tuple(sorted(set(starts).union((first,))))
+            subgraph_bridge_values.update(
+                recipe.result for recipe in _cached_pair_recipes(frontier, value_limit)
+                if recipe.result not in frontier and recipe.result not in initial.missing
+            )
     target_cone = frozenset(
         set(target_support).union(subgraph_support).union(subgraph_bridge_values)
     )
@@ -677,9 +687,12 @@ def plan_bounded_beam(
                 return SharedIntermediatePlan(
                     state.operations, frozenset(goals), (), frozenset(starts)
                 )
+            frontier_recipes = _cached_pair_recipes(tuple(sorted(state.available)), value_limit)
             recipes = [
-                recipe for recipe in _cached_pair_recipes(tuple(sorted(state.available)), value_limit)
-                if recipe.result not in state.available and recipe.result in target_cone
+                recipe for recipe in frontier_recipes
+                if recipe.result not in state.available
+                and (not (enable_target_cone_guidance or enable_shared_subgraph_guidance)
+                     or recipe.result in target_cone)
             ]
             # A capped reverse cone can miss a useful branch. Retain a small,
             # deterministic direct-potential escape hatch rather than pruning
