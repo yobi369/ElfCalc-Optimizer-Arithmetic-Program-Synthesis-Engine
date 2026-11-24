@@ -676,8 +676,8 @@ def plan_bounded_beam(
         except (ValueError, RuntimeError):
             continue
         partial_options.append((
-            -Fraction(len(covered), max(1, len(operations))),
             -len(covered),
+            -Fraction(len(covered), max(1, len(operations))),
             len(operations),
             peak,
             tuple((op.result, op.operator, op.left, op.right) for op in operations),
@@ -690,8 +690,8 @@ def plan_bounded_beam(
         schedule_value_dag(best.operations, starts, value_limit)
         beam_peak = estimate_peak_live_values(best.operations, starts)
         partial_options.append((
-            -Fraction(len(beam_covered), max(1, len(best.operations))),
             -len(beam_covered),
+            -Fraction(len(beam_covered), max(1, len(best.operations))),
             len(best.operations),
             beam_peak,
             tuple((op.result, op.operator, op.left, op.right) for op in best.operations),
