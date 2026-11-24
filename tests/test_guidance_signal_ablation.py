@@ -37,10 +37,8 @@ class GuidanceSignalAblationTests(TestCase):
         self.assertEqual(shared[5], frozenset({12, 35}))
 
     def test_shared_subgraph_only_can_reach_its_predicted_target_completions(self):
-        # 2 + 3 = 5; 2 + 5 = 7 is not the intended bridge. The shared
-        # witness is 5 + 7 = 12 and 5 * 7 = 35, after constructing 7 as 3 + 4
-        # is not possible from these starts. Instead the valid bridge 7 is
-        # formed as 5 + 2, yielding 7 from the shared prefix 5.
+        # Shared construction: 2 + 3 = 5, then 5 + 2 = 7;
+        # the two targets follow as 5 + 7 = 12 and 5 * 7 = 35.
         plan = plan_bounded_beam(
             (2, 3),
             (12, 35),
