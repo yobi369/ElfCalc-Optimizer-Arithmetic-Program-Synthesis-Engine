@@ -6,6 +6,7 @@ from elfcalc.bounded_search import (
     _multi_target_cone_support,
     _shared_completion_yield,
     _shared_subgraph_witnesses,
+    _partial_subgraph_motifs,
     _State,
     plan_bounded_beam,
 )
@@ -125,6 +126,27 @@ class BoundedBeamPlannerTests(unittest.TestCase):
             {operation.result for operation in plan.operations}
         ))
         self.assertTrue(schedule_value_dag(plan.operations, starts, 1000))
+
+    def test_partial_motifs_rank_target_yield_per_instruction(self):
+        candidates = _partial_subgraph_motifs(
+            (2, 3), frozenset({12, 18, 99}), 1000,
+            max_intermediates=2, max_states=1024,
+        )
+        self.assertTrue(candidates)
+        operations, covered = candidates[0]
+        self.assertEqual(covered, frozenset({12, 18}))
+        self.assertEqual(len(operations), 3)
+        self.assertEqual(operations[0].result, 6)
+        self.assertTrue(schedule_value_dag(operations, [2, 3], 1000))
+
+    def test_planner_returns_best_partial_motif_when_goals_remain(self):
+        plan = plan_bounded_beam(
+            [2, 3], [12, 18, 99], 1000,
+            max_intermediates=1, max_depth=3, beam_width=64,
+        )
+        self.assertEqual(set(plan.covered_targets), {12, 18})
+        self.assertEqual(set(plan.missing_targets), {99})
+        self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
 
     def test_beam_finds_two_node_shared_subgraph(self):
         plan = plan_bounded_beam(
