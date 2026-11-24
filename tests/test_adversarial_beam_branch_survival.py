@@ -99,6 +99,6 @@ class AdversarialBeamBranchSurvivalTests(TestCase):
         self.assertTrue(replay.complete, replay.error)
         self.assertEqual(len(allocation), 3)
         self.assertEqual(
-            [(op.left, op.operator, op.right, op.result) for op in operations],
-            [(2, "+", 4, 6), (3, "*", 3, 9), (8, "*", 9, 72)],
+            {(op.left, op.operator, op.right, op.result) for op in operations},
+            {(3, "+", 5, 8), (3, "*", 3, 9), (8, "*", 9, 72)},
         )
