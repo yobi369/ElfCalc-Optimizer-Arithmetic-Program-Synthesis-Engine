@@ -151,12 +151,22 @@ def _multi_target_cone_support(
     }
 
 
-def _rank(state: _State, starts: tuple[int, ...], limit: int) -> tuple:
-    # Coverage is primary. Direct one-step reachability is a useful potential
-    # signal; cost and live pressure then control resource efficiency.
+def _rank(
+    state: _State,
+    starts: tuple[int, ...],
+    limit: int,
+    subgraph_support: dict[int, frozenset[int]] | None = None,
+) -> tuple:
+    # Coverage is primary. Direct reachability and retained shared-subgraph
+    # potential then guide incomplete states; cost and live pressure follow.
+    shared_potential = max(
+        (len(subgraph_support.get(value, ())) for value in state.available),
+        default=0,
+    ) if subgraph_support else 0
     return (
         len(state.missing),
         -_direct_yield(state, limit),
+        -shared_potential,
         len(state.operations),
         _peak(state, starts),
         state.intermediates,
@@ -373,9 +383,9 @@ def plan_bounded_beam(
             break
         frontier = _pareto_by_coverage(expanded, starts)
         beam = tuple(sorted(
-            frontier, key=lambda state: _rank(state, starts, value_limit)
+            frontier, key=lambda state: _rank(state, starts, value_limit, subgraph_support)
         )[:beam_width])
-        if beam and _rank(beam[0], starts, value_limit) < _rank(best, starts, value_limit):
+        if beam and _rank(beam[0], starts, value_limit, subgraph_support) < _rank(best, starts, value_limit, subgraph_support):
             best = beam[0]
         complete = [state for state in beam if not state.missing]
         if complete:
