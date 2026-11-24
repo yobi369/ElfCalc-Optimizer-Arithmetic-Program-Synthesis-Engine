@@ -10,7 +10,7 @@ from elfcalc.bounded_search import (
     _State,
     plan_bounded_beam,
 )
-from elfcalc.register_schedule import schedule_value_dag
+from elfcalc.register_schedule import estimate_peak_live_values, schedule_value_dag
 
 
 class BoundedBeamPlannerTests(unittest.TestCase):
@@ -135,6 +135,9 @@ class BoundedBeamPlannerTests(unittest.TestCase):
             max_depth=3,
             beam_width=32,
             max_expansions_per_state=64,
+            motif_state_budget=128,
+            motif_recipe_budget=16,
+            motif_result_budget=16,
         )
         modes = {
             "beam_only": plan_bounded_beam(
@@ -156,12 +159,21 @@ class BoundedBeamPlannerTests(unittest.TestCase):
                 **common,
             ),
         }
-        for plan in modes.values():
-            self.assertTrue(schedule_value_dag(plan.operations, [2, 3], 1000))
+        metrics = {}
+        for name, plan in modes.items():
+            allocation = schedule_value_dag(plan.operations, [2, 3], 1000)
+            self.assertTrue(allocation)
             self.assertEqual(
                 set(plan.covered_targets).union(plan.missing_targets),
                 {12, 18, 99},
             )
+            metrics[name] = {
+                "coverage": len(plan.covered_targets),
+                "instructions": len(plan.operations),
+                "peak_live": estimate_peak_live_values(plan.operations, [2, 3]),
+            }
+            self.assertLessEqual(metrics[name]["instructions"], common["max_depth"])
+        self.assertEqual(set(metrics), {"beam_only", "complete_witness", "partial_motif"})
         self.assertGreaterEqual(
             len(modes["partial_motif"].covered_targets),
             2,
