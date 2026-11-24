@@ -304,7 +304,10 @@ def _shared_subgraph_witnesses(
 
     while stack and expanded_states < max_states:
         available, prefix = stack.pop()
-        state_key = (tuple(sorted(available)), len(prefix))
+        prefix_signature = tuple(sorted(
+            (op.result, op.operator, op.left, op.right) for op in prefix
+        ))
+        state_key = (tuple(sorted(available)), prefix_signature)
         if state_key in visited:
             continue
         visited.add(state_key)
@@ -380,9 +383,9 @@ def _partial_subgraph_motifs(
 
     while stack and expanded < max_states:
         available, prefix = stack.pop()
-        signature = tuple(
-            (op.left, op.operator, op.right, op.result) for op in prefix
-        )
+        signature = tuple(sorted(
+            (op.result, op.operator, op.left, op.right) for op in prefix
+        ))
         state_key = (tuple(sorted(available)), signature)
         if state_key in visited:
             continue
