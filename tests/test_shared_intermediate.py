@@ -5,6 +5,7 @@ from elfcalc.shared_intermediate import (
     _candidate_target_yields,
     _pair_recipes,
     _pair_recipes_for_pair,
+    _pareto_frontier,
     _recipe_order,
     plan_shared_intermediates,
 )
@@ -27,6 +28,20 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         # The cost-aware tie-break now selects 6 (2*3), which has lower
         # estimated live-value pressure under the scheduler's ordering.
         self.assertEqual(plan.operations[0].result, 6)
+
+    def test_pareto_frontier_preserves_tradeoffs_and_removes_dominated(self):
+        items = ("low-cost", "low-pressure", "dominated", "equal-metric")
+        metrics = {
+            "low-cost": (4, 3, -2),
+            "low-pressure": (5, 2, -2),
+            "dominated": (6, 4, -1),
+            "equal-metric": (4, 3, -2),
+        }
+        frontier = _pareto_frontier(items, metrics.__getitem__)
+        self.assertEqual(
+            frontier,
+            ("low-cost", "low-pressure", "equal-metric"),
+        )
 
     def test_inverse_target_cones_match_brute_force_relations(self):
         available = (2, 3, 4, 6, 8, 12)
