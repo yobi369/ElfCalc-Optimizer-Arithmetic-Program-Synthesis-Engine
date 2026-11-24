@@ -36,6 +36,30 @@ class GuidanceSignalAblationTests(TestCase):
         )
         self.assertEqual(shared[5], frozenset({12, 35}))
 
+    def test_shared_subgraph_only_can_reach_its_predicted_target_completions(self):
+        # 2 + 3 = 5; 2 + 5 = 7 is not the intended bridge. The shared
+        # witness is 5 + 7 = 12 and 5 * 7 = 35, after constructing 7 as 3 + 4
+        # is not possible from these starts. Instead the valid bridge 7 is
+        # formed as 5 + 2, yielding 7 from the shared prefix 5.
+        plan = plan_bounded_beam(
+            (2, 3),
+            (12, 35),
+            1000,
+            max_intermediates=2,
+            max_depth=4,
+            beam_width=1,
+            max_expansions_per_state=1,
+            enable_complete_witnesses=False,
+            enable_partial_motifs=False,
+            enable_target_cone_guidance=False,
+            enable_shared_subgraph_guidance=True,
+        )
+        allocation = schedule_value_dag(plan.operations, (2, 3), 1000)
+        self.assertEqual(plan.covered_targets, frozenset({12, 35}))
+        replay = validate_program(Puzzle("shared_subgraph_goal_admission", (2, 3),
+                                         (12, 35), 1000), allocation)
+        self.assertTrue(replay.complete, replay.error)
+
     def test_guidance_ablation_under_identical_search_limits_and_exact_replay(self):
         results = {}
         for name, starts, targets, limit, intermediates, depth, width, expansions in FIXTURES:
