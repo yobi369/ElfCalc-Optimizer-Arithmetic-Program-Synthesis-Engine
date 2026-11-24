@@ -89,6 +89,37 @@ class SearchDiversityTournamentTests(TestCase):
             (6, "+", 3, 3),
         )
 
+    def test_reserved_branch_survives_to_expose_a_target_the_leader_cannot(self):
+        starts = (2, 3, 4, 5)
+        missing = frozenset((40,))
+        root_a = PlannedOperation(2, "+", 4, 6, False)
+        root_b = PlannedOperation(3, "+", 5, 8, False)
+        leader = search._State(
+            (root_a,), frozenset((*starts, 6)), missing, 1
+        )
+        alternative = search._State(
+            (root_b,), frozenset((*starts, 8)), missing, 1
+        )
+
+        # The leader has no one-step recipe for 40; the distinct branch does:
+        # 8 * 5 = 40. Force the leader to rank first to test reservation itself.
+        self.assertEqual(search._direct_yield(leader, 100), 0)
+        self.assertEqual(search._direct_yield(alternative, 100), 1)
+        with patch.object(search, "_rank", side_effect=lambda state, *_: (
+            0 if state is leader else 1
+        )):
+            selected = search._select_diverse_beam(
+                (leader, alternative), 2, starts, 100
+            )
+
+        self.assertEqual(selected, (leader, alternative))
+        surviving = selected[1]
+        self.assertIn(40, {
+            recipe.result for recipe in search._cached_pair_recipes(
+                tuple(sorted(surviving.available)), 100
+            )
+        })
+
     def test_six_configuration_tournament_across_synthetic_families(self):
         rows = []
         configurations = (
