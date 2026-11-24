@@ -88,6 +88,24 @@ class SharedIntermediatePlannerTests(unittest.TestCase):
         self.assertEqual(plan.intermediate_count, 2)
         self.assertEqual(tuple(op.result for op in plan.operations), (1, 25, 26))
 
+    def test_cooperating_search_does_not_reuse_missing_target_as_intermediate(self):
+        from elfcalc.shared_intermediate import _best_cooperating_intermediates
+
+        available = (2, 5)
+        missing = frozenset({7, 26})
+        recipes = {
+            recipe.result: recipe
+            for recipe in _pair_recipes(available, 100)
+            if recipe.result not in available
+        }
+        result = _best_cooperating_intermediates(recipes, missing, 100)
+        self.assertIsNotNone(result)
+        first, second, target_recipes = result
+        self.assertNotIn(first.result, missing)
+        self.assertNotIn(second.result, missing)
+        self.assertTrue(all(recipe.result not in (first.result, second.result)
+                            for recipe in target_recipes))
+
     def test_cooperating_intermediates_respect_budget(self):
         plan = plan_shared_intermediates([2, 5], [26], 100, max_intermediates=1)
         self.assertEqual(plan.missing_targets, (26,))
