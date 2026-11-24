@@ -1,6 +1,10 @@
 import unittest
 
-from elfcalc.bounded_search import plan_bounded_beam
+from elfcalc.bounded_search import (
+    _backward_target_cone,
+    _forward_anchor_pool,
+    plan_bounded_beam,
+)
 from elfcalc.register_schedule import schedule_value_dag
 
 
@@ -17,6 +21,18 @@ class BoundedBeamPlannerTests(unittest.TestCase):
         # The planner itself now requires the same register allocator and VM
         # replay used by the production lowering path.
         self.assertTrue(schedule_value_dag(plan.operations, [2], 100000))
+
+    def test_reverse_cone_contains_three_step_power_chain(self):
+        anchors = _forward_anchor_pool((2,), 100000, 4, 512)
+        cone = _backward_target_cone(frozenset({65536}), anchors, 100000, 4, 4096)
+        self.assertTrue({2, 4, 16, 256, 65536}.issubset(cone))
+
+    def test_reverse_cone_is_bounded_and_deterministic(self):
+        anchors = _forward_anchor_pool((2, 3), 1000, 3, 128)
+        first = _backward_target_cone(frozenset({72}), anchors, 1000, 3, 256)
+        second = _backward_target_cone(frozenset({72}), anchors, 1000, 3, 256)
+        self.assertEqual(first, second)
+        self.assertLessEqual(len(first), 256)
 
     def test_respects_intermediate_budget(self):
         plan = plan_bounded_beam(
